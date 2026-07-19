@@ -10,8 +10,12 @@
 <script>
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({ appId: "3084233f-3ef2-41e1-963b-3181c5637463" });
-    window.__oneSignalReady = OneSignal;
+    try {
+      await OneSignal.init({ appId: "3084233f-3ef2-41e1-963b-3181c5637463" });
+      window.__oneSignalReady = OneSignal;
+    } catch (e) {
+      window.__oneSignalInitError = (e && e.message) ? e.message : String(e);
+    }
   });
 </script>
 <style>
@@ -139,7 +143,9 @@ async function renderPublic(id){
     }
     if (!OneSignal) {
       pushBtn.disabled = false;
-      pushBtn.textContent = "Notifications indisponibles, réessaie";
+      pushBtn.textContent = window.__oneSignalInitError
+        ? ("Erreur : " + window.__oneSignalInitError).slice(0, 60)
+        : "Notifications indisponibles, réessaie";
       return;
     }
     try {
