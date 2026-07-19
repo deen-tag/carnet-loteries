@@ -128,9 +128,20 @@ async function renderPublic(id){
 
   document.getElementById("push-btn").onclick = async () => {
     const pushBtn = document.getElementById("push-btn");
-    const OneSignal = window.__oneSignalReady;
-    if (!OneSignal) { pushBtn.textContent = "Chargement… réessaie dans 2s"; return; }
     pushBtn.disabled = true; pushBtn.textContent = "…";
+
+    let OneSignal = window.__oneSignalReady;
+    let tries = 0;
+    while (!OneSignal && tries < 20) {
+      await new Promise(r => setTimeout(r, 300));
+      OneSignal = window.__oneSignalReady;
+      tries++;
+    }
+    if (!OneSignal) {
+      pushBtn.disabled = false;
+      pushBtn.textContent = "Notifications indisponibles, réessaie";
+      return;
+    }
     try {
       await OneSignal.Notifications.requestPermission();
       await OneSignal.User.addTag("resto", id);
