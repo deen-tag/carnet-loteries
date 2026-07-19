@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Carnet des loteries</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FBF1DE; --paper2:#F4E7CC; --ink:#16281C;
+    --tomato:#C1440E; --mustard:#E3A72E; --stone:#8B8378;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',sans-serif;background:var(--paper2);color:var(--ink);}
+  .display{font-family:'Fraunces',serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .stamp{display:inline-block;border:2px solid var(--tomato);color:var(--tomato);padding:2px 10px;border-radius:999px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;transform:rotate(-2deg);font-family:'IBM Plex Mono',monospace;}
+  .card{background:var(--paper);border-radius:16px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
+  .btn{border:none;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;font-size:14px;}
+  .btn-primary{background:var(--tomato);color:#fff;}
+  .btn-secondary{background:#fff;border:1.5px solid var(--paper2);color:var(--ink);}
+  input[type=text],input[type=email]{width:100%;padding:10px;border-radius:8px;border:1.5px solid var(--paper2);font-family:'Inter',sans-serif;font-size:15px;}
+  label.field{display:block;font-size:12px;color:var(--stone);font-weight:600;margin-bottom:6px;}
+  .err{color:var(--tomato);font-size:13px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;}
+  .resto-card{cursor:pointer;text-align:left;border:none;}
+  .modal-bg{position:fixed;inset:0;background:rgba(22,40,28,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;}
+  .hidden{display:none !important;}
+  a{color:var(--tomato);}
+  .participant-row{display:flex;justify-content:space-between;font-size:13px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid var(--paper2);margin-bottom:6px;flex-wrap:wrap;gap:6px;}
+</style>
+</head>
+<body>
+
+<div id="app" style="max-width:720px;margin:0 auto;padding:32px 20px;"></div>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyD6VGuVkh0Xb23JQnRDjc2apRumJyPgxYI",
+  authDomain: "carnet-loteries.firebaseapp.com",
+  projectId: "carnet-loteries",
+  storageBucket: "carnet-loteries.firebasestorage.app",
+  messagingSenderId: "525322331265",
+  appId: "1:525322331265:web:a5df784e1b0e079a62d980"
+};
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const $app = document.getElementById("app");
+const params = new URLSearchParams(window.location.search);
+const restoId = params.get("resto");
+
+function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+function configMissing(){
+  return Object.values(firebaseConfig).some(v => String(v).includes("REMPLACE_MOI"));
+}
+
+if (configMissing()) {
+  $app.innerHTML = `
+    <div class="card">
+      <span class="stamp">Configuration requise</span>
+      <h1 class="display" style="font-size:24px;margin:12px 0 8px;">Il manque ta configuration Firebase</h1>
+      <p style="color:var(--stone);font-size:14px;">Ouvre index.html et vérifie firebaseConfig.</p>
+    </div>`;
+} else if (restoId) {
+  renderPublic(restoId);
+} else {
+  renderAdmin();
+}
+
+async function renderPublic(id){
+  document.body.style.background = "var(--ink)";
+  $app.style.display="flex"; $app.style.alignItems="center"; $app.style.justifyContent="center"; $app.style.minHeight="100vh";
+
+  $app.innerHTML = `<div class="mono" style="color:#fff;">Chargement…</div>`;
+
+  const snap = await getDocs(query(collection(db,"restaurants")));
+  const r = snap.docs.find(d => d.id === id);
+
+  if (!r){
+    $app.innerHTML = `<div style="color:#fff;text-align:center;padding:20px;">Ce commerçant n'existe pas (ou plus). Vérifie le QR code.</div>`;
+    return;
+  }
+  const data = r.data();
+
+  $app.innerHTML = `
+    <div style="width:100%;max-width:420px;">
+      <div class="card" style="border-radius:18px 18px 4px 4px;">
+        <span class="stamp">Loterie</span>
+        <h1 class="display" style="font-size:30px;margin:12px 0 4px;">${esc(data.name)}</h1>
+        <p style="color:var(--stone);font-size:14px;margin:0 0 20px;">
+          À gagner : <strong style="color:var(--tomato);">${esc(data.prize)}</strong>
+          ${data.date ? ` · Tirage le ${esc(data.date)}` : ""}
+        </p>
+        <div id="ticket-form">
+          <label class="field">PRÉNOM</label>
+          <input type="text" id="f-prenom" placeholder="Ton prénom" style="margin-bottom:16px;">
+          <label class="field">EMAIL</label>
+          <input type="email" id="f-email" placeholder="ton@email.com" style="margin-bottom:16px;">
+          <label style="display:flex;gap:10px;font-size:13px;margin-bottom:10px;cursor:pointer;">
+            <input type="checkbox" id="f-result"> Je veux connaître le résultat du tirage (obligatoire)
+          </label>
+          <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:18px;cursor:pointer;">
+            <input type="checkbox" id="f-promo"> J'accepte de recevoir des offres de ${esc(data.name)} (facultatif)
+          </label>
+          <p id="f-err" class="err"></p>
+          <button class="btn btn-primary" style="width:100%;" id="f-submit">Valider mon ticket</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById("f-submit").onclick = async () => {
+    const prenom = document.getElementById("f-prenom").value.trim();
+    const email = document.getElementById("f-email").value.trim();
+    const wantsResult = document.getElementById("f-result").checked;
+    const wantsPromo = document.getElementById("f-promo").checked;
+    const errEl = document.getElementById("f-err");
+    errEl.textContent = "";
+
+    if (!prenom) return errEl.textContent = "Ton prénom manque à l'appel.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return errEl.textContent = "Cette adresse email ne semble pas valide.";
+    if (!wantsResult) return errEl.textContent = "Coche la case pour connaître le résultat — c'est obligatoire.";
+
+    const btn = document.getElementById("f-submit");
+    btn.disabled = true; btn.textContent = "Envoi…";
+    try{
+      await addDoc(collection(db,"participants"), {
+        restaurantId: id, prenom, email, wantsResult, wantsPromo, ts: serverTimestamp()
+      });
+      document.getElementById("ticket-form").innerHTML = `
+        <div style="text-align:center;padding:10px 0 20px;">
+          <p class="display" style="font-size:20px;">🎉 Ticket enregistré !</p>
+          <p style="color:var(--stone);font-size:14px;">Résultat annoncé par email si tu gagnes.</p>
+        </div>`;
+    }catch(e){
+      errEl.textContent = "Le ticket n'a pas pu être enregistré. Réessaie.";
+      btn.disabled = false; btn.textContent = "Valider mon ticket";
+    }
+  };
+}
+
+async function renderAdmin(){
+  $app.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:26px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <span class="stamp" style="border-color:var(--mustard);color:var(--mustard);">Carnet</span>
+        <h1 class="display" style="font-size:32px;margin:10px 0 2px;">Loteries des commerçants</h1>
+        <p style="color:var(--stone);font-size:14px;margin:0;">Un QR code par commerçant, un seul site pour tous.</p>
+      </div>
+      <button class="btn btn-primary" id="btn-add">+ Nouveau commerçant</button>
+    </div>
+    <div id="list" class="grid"><p style="color:var(--stone);">Chargement…</p></div>
+    <div id="detail"></div>
+  `;
+  document.getElementById("btn-add").onclick = openAddModal;
+  await loadList();
+}
+
+async function loadList(){
+  const listEl = document.getElementById("list");
+  const [rSnap, pSnap] = await Promise.all([
+    getDocs(collection(db,"restaurants")),
+    getDocs(collection(db,"participants"))
+  ]);
+  const counts = {};
+  pSnap.forEach(d => { const rid = d.data().restaurantId; counts[rid] = (counts[rid]||0)+1; });
+
+  if (rSnap.empty){
+    listEl.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;">
+      <p class="display" style="font-size:18px;">Aucun commerçant pour l'instant</p>
+      <p style="color:var(--stone);font-size:14px;">Crée ton premier commerçant pour générer son QR code.</p>
+    </div>`;
+    return;
+  }
+  listEl.innerHTML = "";
+  rSnap.forEach(d => {
+    const data = d.data();
+    const card = document.createElement("button");
+    card.className = "card resto-card";
+    card.innerHTML = `
+      <span class="stamp">${counts[d.id]||0} particip.</span>
+      <h3 class="display" style="font-size:19px;margin:10px 0 3px;">${esc(data.name)}</h3>
+      <p style="font-size:13px;color:var(--stone);margin:0;">${esc(data.prize)}</p>`;
+    card.onclick = () => renderDetail(d.id, data);
+    listEl.appendChild(card);
+  });
+}
+
+function openAddModal(){
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.innerHTML = `
+    <div class="card" style="max-width:380px;width:100%;">
+      <h3 class="display" style="margin-top:0;">Nouveau commerçant</h3>
+      <label class="field">NOM DU COMMERCE</label>
+      <input type="text" id="m-name" placeholder="Pizzeria Bella" style="margin-bottom:14px;">
+      <label class="field">LOT À GAGNER</label>
+      <input type="text" id="m-prize" placeholder="Une pizza offerte" style="margin-bottom:14px;">
+      <label class="field">DATE DU TIRAGE (optionnel)</label>
+      <input type="text" id="m-date" placeholder="15 août 2026" style="margin-bottom:14px;">
+      <p id="m-err" class="err"></p>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;" id="m-cancel">Annuler</button>
+        <button class="btn btn-primary" style="flex:1;" id="m-save">Créer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  document.getElementById("m-cancel").onclick = () => bg.remove();
+  document.getElementById("m-save").onclick = async () => {
+    const name = document.getElementById("m-name").value.trim();
+    const prize = document.getElementById("m-prize").value.trim();
+    const date = document.getElementById("m-date").value.trim();
+    const errEl = document.getElementById("m-err");
+    if (!name || !prize){ errEl.textContent = "Le nom et le lot sont obligatoires."; return; }
+    const btn = document.getElementById("m-save");
+    btn.disabled = true; btn.textContent = "…";
+    try{
+      await addDoc(collection(db,"restaurants"), { name, prize, date, createdAt: serverTimestamp() });
+      bg.remove();
+      await loadList();
+    }catch(e){
+      errEl.textContent = "Erreur : " + (e?.message || String(e));
+      btn.disabled = false; btn.textContent = "Créer";
+    }
+  };
+}
+
+async function renderDetail(id, data){
+  const detail = document.getElementById("detail");
+  const publicUrl = `${window.location.origin}${window.location.pathname}?resto=${id}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(publicUrl)}`;
+
+  detail.innerHTML = `
+    <div class="card" style="margin-top:20px;">
+      <span class="stamp">${esc(data.name)}</span>
+      <h2 class="display" style="font-size:26px;margin:10px 0 2px;">${esc(data.name)}</h2>
+      <p style="color:var(--stone);font-size:14px;">Lot : <strong>${esc(data.prize)}</strong>${data.date ? ` · Tirage le ${esc(data.date)}`:""}</p>
+      <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap;">
+        <img src="${qrUrl}" width="140" height="140" style="border-radius:10px;border:1px solid var(--paper2);">
+        <div style="flex:1;min-width:200px;">
+          <label class="field">LIEN À PARTAGER</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" readonly value="${publicUrl}" id="link-input" class="mono" style="font-size:12px;">
+            <button class="btn btn-secondary" id="copy-btn">Copier</button>
+          </div>
+          <p style="font-size:12px;color:var(--stone);margin-top:10px;">Imprime le QR code et affiche-le en salle.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 class="display" style="margin:0;font-size:18px;">Tirage au sort</h3>
+        <button class="btn btn-primary" id="draw-btn">🎁 Tirer un gagnant</button>
+      </div>
+      <div id="winner-box" style="font-size:13px;color:var(--stone);">Clique sur "Tirer un gagnant" quand tu es prêt.</div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <h3 class="display" style="font-size:18px;margin:0 0 12px;">Participants</h3>
+      <div id="participants-list">Chargement…</div>
+    </div>
+  `;
+
+  document.getElementById("copy-btn").onclick = async () => {
+    try{ await navigator.clipboard.writeText(publicUrl); document.getElementById("copy-btn").textContent = "Copié !"; }
+    catch{ document.getElementById("link-input").select(); }
+  };
+
+  const pSnap = await getDocs(query(collection(db,"participants"), where("restaurantId","==",id)));
+  const participants = pSnap.docs.map(d => d.data());
+
+  const listEl = document.getElementById("participants-list");
+  if (participants.length === 0){
+    listEl.innerHTML = `<p style="font-size:13px;color:var(--stone);">Personne n'a encore scanné le QR code.</p>`;
+  } else {
+    listEl.innerHTML = participants.map(p => `
+      <div class="participant-row">
+        <span style="font-weight:600;">${esc(p.prenom)}</span>
+        <span class="mono" style="color:var(--stone);">${esc(p.email)}</span>
+        <span style="color:${p.wantsPromo ? "var(--tomato)" : "var(--stone)"};">${p.wantsPromo ? "promo ok" : "résultat seul"}</span>
+      </div>`).join("");
+  }
+
+  document.getElementById("draw-btn").onclick = () => {
+    const box = document.getElementById("winner-box");
+    if (participants.length === 0){ box.textContent = "Aucun participant pour l'instant."; return; }
+    let i = 0;
+    const spin = setInterval(() => {
+      const w = participants[Math.floor(Math.random()*participants.length)];
+      box.innerHTML = `<div style="text-align:center;padding:14px 0;background:var(--paper2);border-radius:10px;">
+        <p style="font-size:12px;color:var(--stone);margin:0;">...</p>
+        <p class="display" style="font-size:24px;color:var(--tomato);margin:4px 0;">${esc(w.prenom)}</p>
+      </div>`;
+      i++;
+      if (i > 14){
+        clearInterval(spin);
+        box.innerHTML = `<div style="text-align:center;padding:14px 0;background:var(--paper2);border-radius:10px;">
+          <p style="font-size:12px;color:var(--stone);margin:0;">GAGNANT</p>
+          <p class="display" style="font-size:24px;color:var(--tomato);margin:4px 0;">${esc(w.prenom)}</p>
+          <p style="font-size:13px;color:var(--stone);margin:0;">${esc(w.email)}</p>
+        </div>`;
+      }
+    }, 90);
+  };
+}
+</script>
+</body>
+</html>
