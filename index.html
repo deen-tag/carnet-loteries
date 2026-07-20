@@ -11,7 +11,7 @@
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(async function(OneSignal) {
     try {
-      await OneSignal.init({ appId: "3084233f-3ef2-41e1-963b-3181c5637463" });
+      await OneSignal.init({ appId: "ed8e48a0-0f7c-44fb-8630-0e0a84eb9545" });
       window.__oneSignalReady = OneSignal;
     } catch (e) {
       window.__oneSignalInitError = (e && e.message) ? e.message : String(e);
@@ -245,7 +245,7 @@ async function loadList(){
       <p style="font-size:13px;color:var(--stone);margin:0;">${esc(data.prize)}</p>`;
     card.onclick = () => {
       document.getElementById("detail").innerHTML = `<p style="color:var(--stone);margin-top:20px;">Chargement du commerçant…</p>`;
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      document.getElementById("detail").scrollIntoView({ behavior: "smooth", block: "start" });
       renderDetail(d.id, data).catch(e => {
         document.getElementById("detail").innerHTML = `<div class="card" style="margin-top:20px;"><p class="err">Erreur : ${esc(e?.message || String(e))}</p></div>`;
       });
