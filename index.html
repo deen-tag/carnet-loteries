@@ -65,7 +65,7 @@ const firebaseConfig = {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp
+  getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp, deleteDoc, doc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -162,7 +162,14 @@ async function renderPublic(id){
     }
     try {
       await OneSignal.Notifications.requestPermission();
-      await OneSignal.User.addTag("resto", id);
+      const prenomVal = document.getElementById("f-prenom").value.trim();
+      const emailVal = document.getElementById("f-email").value.trim();
+      await OneSignal.User.addTags({
+        resto_id: id,
+        resto_nom: data.name,
+        prenom: prenomVal || "(non renseigné)",
+        email: emailVal || "(non renseigné)"
+      });
       pushBtn.textContent = "🔔 Notifications activées";
     } catch (e) {
       pushBtn.disabled = false;
@@ -220,6 +227,10 @@ async function renderAdmin(){
 
 async function loadList(){
   const listEl = document.getElementById("list");
+  listEl.className = "";
+  listEl.style.display = "flex";
+  listEl.style.flexDirection = "column";
+  listEl.style.gap = "16px";
   const [rSnap, pSnap] = await Promise.all([
     getDocs(collection(db,"restaurants")),
     getDocs(collection(db,"participants"))
@@ -228,7 +239,7 @@ async function loadList(){
   pSnap.forEach(d => { const rid = d.data().restaurantId; counts[rid] = (counts[rid]||0)+1; });
 
   if (rSnap.empty){
-    listEl.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;">
+    listEl.innerHTML = `<div class="card" style="text-align:center;">
       <p class="display" style="font-size:18px;">Aucun commerçant pour l'instant</p>
       <p style="color:var(--stone);font-size:14px;">Crée ton premier commerçant pour générer son QR code.</p>
     </div>`;
@@ -237,20 +248,50 @@ async function loadList(){
   listEl.innerHTML = "";
   rSnap.forEach(d => {
     const data = d.data();
-    const card = document.createElement("button");
-    card.className = "card resto-card";
-    card.innerHTML = `
-      <span class="stamp">${counts[d.id]||0} particip.</span>
-      <h3 class="display" style="font-size:19px;margin:10px 0 3px;">${esc(data.name)}</h3>
-      <p style="font-size:13px;color:var(--stone);margin:0;">${esc(data.prize)}</p>`;
-    card.onclick = () => {
-      document.getElementById("detail").innerHTML = `<p style="color:var(--stone);margin-top:20px;">Chargement du commerçant…</p>`;
-      document.getElementById("detail").scrollIntoView({ behavior: "smooth", block: "start" });
-      renderDetail(d.id, data).catch(e => {
-        document.getElementById("detail").innerHTML = `<div class="card" style="margin-top:20px;"><p class="err">Erreur : ${esc(e?.message || String(e))}</p></div>`;
-      });
+    const wrap = document.createElement("div");
+    wrap.className = "card";
+    wrap.style.padding = "0";
+    wrap.innerHTML = `
+      <div class="resto-header" style="display:flex;justify-content:space-between;align-items:center;padding:18px 20px;cursor:pointer;gap:10px;">
+        <div>
+          <span class="stamp">${counts[d.id]||0} particip.</span>
+          <h3 class="display" style="font-size:19px;margin:10px 0 3px;">${esc(data.name)}</h3>
+          <p style="font-size:13px;color:var(--stone);margin:0;">${esc(data.prize)}</p>
+        </div>
+        <button class="btn btn-secondary del-btn" style="padding:8px 12px;flex-shrink:0;">🗑️</button>
+      </div>
+      <div class="resto-body" style="display:none;padding:0 20px 20px;"></div>
+    `;
+    const header = wrap.querySelector(".resto-header");
+    const body = wrap.querySelector(".resto-body");
+    const delBtn = wrap.querySelector(".del-btn");
+
+    header.onclick = async () => {
+      if (body.style.display === "none") {
+        body.style.display = "block";
+        body.innerHTML = `<p style="color:var(--stone);">Chargement…</p>`;
+        try { await renderDetailInline(d.id, data, body); }
+        catch(e){ body.innerHTML = `<p class="err">Erreur : ${esc(e?.message || String(e))}</p>`; }
+      } else {
+        body.style.display = "none";
+        body.innerHTML = "";
+      }
     };
-    listEl.appendChild(card);
+
+    delBtn.onclick = async (ev) => {
+      ev.stopPropagation();
+      if (!confirm(`Supprimer "${data.name}" ? Cette action est définitive.`)) return;
+      delBtn.disabled = true; delBtn.textContent = "…";
+      try {
+        await deleteDoc(doc(db, "restaurants", d.id));
+        await loadList();
+      } catch(err) {
+        alert("Erreur suppression : " + (err?.message || String(err)));
+        delBtn.disabled = false; delBtn.textContent = "🗑️";
+      }
+    };
+
+    listEl.appendChild(wrap);
   });
 }
 
@@ -293,52 +334,45 @@ function openAddModal(){
   };
 }
 
-async function renderDetail(id, data){
-  const detail = document.getElementById("detail");
+async function renderDetailInline(id, data, container){
   const publicUrl = `${window.location.origin}${window.location.pathname}?resto=${id}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(publicUrl)}`;
 
-  detail.innerHTML = `
-    <div class="card" style="margin-top:20px;">
-      <span class="stamp">${esc(data.name)}</span>
-      <h2 class="display" style="font-size:26px;margin:10px 0 2px;">${esc(data.name)}</h2>
-      <p style="color:var(--stone);font-size:14px;">Lot : <strong>${esc(data.prize)}</strong>${data.date ? ` · Tirage le ${esc(data.date)}`:""}</p>
-      <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap;">
+  container.innerHTML = `
+    <div style="border-top:1px solid var(--paper2);padding-top:18px;">
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
         <img src="${qrUrl}" width="140" height="140" style="border-radius:10px;border:1px solid var(--paper2);">
         <div style="flex:1;min-width:200px;">
           <label class="field">LIEN À PARTAGER</label>
           <div style="display:flex;gap:8px;">
-            <input type="text" readonly value="${publicUrl}" id="link-input" class="mono" style="font-size:12px;">
-            <button class="btn btn-secondary" id="copy-btn">Copier</button>
+            <input type="text" readonly value="${publicUrl}" class="link-input mono" style="font-size:12px;width:100%;padding:10px;border-radius:8px;border:1.5px solid var(--paper2);">
+            <button class="btn btn-secondary copy-btn">Copier</button>
           </div>
           <p style="font-size:12px;color:var(--stone);margin-top:10px;">Imprime le QR code et affiche-le en salle.</p>
         </div>
       </div>
-    </div>
 
-    <div class="card" style="margin-top:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h3 class="display" style="margin:0;font-size:18px;">Tirage au sort</h3>
-        <button class="btn btn-primary" id="draw-btn">🎁 Tirer un gagnant</button>
+      <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;">
+        <h4 class="display" style="margin:0;font-size:16px;">Tirage au sort</h4>
+        <button class="btn btn-primary draw-btn">🎁 Tirer un gagnant</button>
       </div>
-      <div id="winner-box" style="font-size:13px;color:var(--stone);">Clique sur "Tirer un gagnant" quand tu es prêt.</div>
-    </div>
+      <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:8px;">Clique sur "Tirer un gagnant" quand tu es prêt.</div>
 
-    <div class="card" style="margin-top:20px;">
-      <h3 class="display" style="font-size:18px;margin:0 0 12px;">Participants</h3>
-      <div id="participants-list">Chargement…</div>
+      <h4 class="display" style="font-size:16px;margin:20px 0 10px;">Participants</h4>
+      <div class="participants-list">Chargement…</div>
     </div>
   `;
 
-  document.getElementById("copy-btn").onclick = async () => {
-    try{ await navigator.clipboard.writeText(publicUrl); document.getElementById("copy-btn").textContent = "Copié !"; }
-    catch{ document.getElementById("link-input").select(); }
+  container.querySelector(".copy-btn").onclick = async () => {
+    const btn = container.querySelector(".copy-btn");
+    try{ await navigator.clipboard.writeText(publicUrl); btn.textContent = "Copié !"; }
+    catch{ container.querySelector(".link-input").select(); }
   };
 
   const pSnap = await getDocs(query(collection(db,"participants"), where("restaurantId","==",id)));
   const participants = pSnap.docs.map(d => d.data());
 
-  const listEl = document.getElementById("participants-list");
+  const listEl = container.querySelector(".participants-list");
   if (participants.length === 0){
     listEl.innerHTML = `<p style="font-size:13px;color:var(--stone);">Personne n'a encore scanné le QR code.</p>`;
   } else {
@@ -350,8 +384,8 @@ async function renderDetail(id, data){
       </div>`).join("");
   }
 
-  document.getElementById("draw-btn").onclick = () => {
-    const box = document.getElementById("winner-box");
+  container.querySelector(".draw-btn").onclick = () => {
+    const box = container.querySelector(".winner-box");
     if (participants.length === 0){ box.textContent = "Aucun participant pour l'instant."; return; }
     let i = 0;
     const spin = setInterval(() => {
