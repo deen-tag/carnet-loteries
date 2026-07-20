@@ -48,6 +48,11 @@
 <div id="app" style="max-width:720px;margin:0 auto;padding:32px 20px;"></div>
 
 <script type="module">
+/* ============================================================
+   🔧 CONFIGURATION FIREBASE — remplace les valeurs ci-dessous
+   par celles de TON projet Firebase (Console Firebase >
+   Paramètres du projet > Tes applications > SDK config).
+   ============================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyD6VGuVkh0Xb23JQnRDjc2apRumJyPgxYI",
   authDomain: "carnet-loteries.firebaseapp.com",
@@ -56,6 +61,7 @@ const firebaseConfig = {
   messagingSenderId: "525322331265",
   appId: "1:525322331265:web:a5df784e1b0e079a62d980"
 };
+/* ============================================================ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -71,6 +77,7 @@ const restoId = params.get("resto");
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
 
+// ---------- CONFIG CHECK ----------
 function configMissing(){
   return Object.values(firebaseConfig).some(v => String(v).includes("REMPLACE_MOI"));
 }
@@ -80,7 +87,11 @@ if (configMissing()) {
     <div class="card">
       <span class="stamp">Configuration requise</span>
       <h1 class="display" style="font-size:24px;margin:12px 0 8px;">Il manque ta configuration Firebase</h1>
-      <p style="color:var(--stone);font-size:14px;">Ouvre index.html et vérifie firebaseConfig.</p>
+      <p style="color:var(--stone);font-size:14px;">
+        Ouvre <span class="mono">index.html</span>, trouve le bloc <span class="mono">firebaseConfig</span>
+        tout en haut du script, et remplace les valeurs "REMPLACE_MOI" par celles de ton projet Firebase
+        (Console Firebase → Paramètres du projet → Tes applications → SDK config). Voir le README.
+      </p>
     </div>`;
 } else if (restoId) {
   renderPublic(restoId);
@@ -88,6 +99,7 @@ if (configMissing()) {
   renderAdmin();
 }
 
+// ================= PUBLIC TICKET PAGE =================
 async function renderPublic(id){
   document.body.style.background = "var(--ink)";
   $app.style.display="flex"; $app.style.alignItems="center"; $app.style.justifyContent="center"; $app.style.minHeight="100vh";
@@ -188,6 +200,7 @@ async function renderPublic(id){
   };
 }
 
+// ================= ADMIN DASHBOARD =================
 async function renderAdmin(){
   $app.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:26px;flex-wrap:wrap;gap:12px;">
@@ -230,7 +243,13 @@ async function loadList(){
       <span class="stamp">${counts[d.id]||0} particip.</span>
       <h3 class="display" style="font-size:19px;margin:10px 0 3px;">${esc(data.name)}</h3>
       <p style="font-size:13px;color:var(--stone);margin:0;">${esc(data.prize)}</p>`;
-    card.onclick = () => renderDetail(d.id, data);
+    card.onclick = () => {
+      document.getElementById("detail").innerHTML = `<p style="color:var(--stone);margin-top:20px;">Chargement du commerçant…</p>`;
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      renderDetail(d.id, data).catch(e => {
+        document.getElementById("detail").innerHTML = `<div class="card" style="margin-top:20px;"><p class="err">Erreur : ${esc(e?.message || String(e))}</p></div>`;
+      });
+    };
     listEl.appendChild(card);
   });
 }
