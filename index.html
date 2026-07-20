@@ -65,7 +65,7 @@ const firebaseConfig = {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp, deleteDoc, doc
+  getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp, deleteDoc, doc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -273,6 +273,7 @@ async function loadList(){
         try { await renderDetailInline(d.id, data, body); }
         catch(e){ body.innerHTML = `<p class="err">Erreur : ${esc(e?.message || String(e))}</p>`; }
       } else {
+        if (body._unsub) { body._unsub(); body._unsub = null; }
         body.style.display = "none";
         body.innerHTML = "";
       }
@@ -346,7 +347,7 @@ async function renderDetailInline(id, data, container){
           <label class="field">LIEN À PARTAGER</label>
           <div style="display:flex;gap:8px;">
             <input type="text" readonly value="${publicUrl}" class="link-input mono" style="font-size:12px;width:100%;padding:10px;border-radius:8px;border:1.5px solid var(--paper2);">
-            <button class="btn btn-secondary copy-btn">Copier</button>
+            <button class="btn btn-secondary copy-link-btn">Copier</button>
           </div>
           <p style="font-size:12px;color:var(--stone);margin-top:10px;">Imprime le QR code et affiche-le en salle.</p>
         </div>
@@ -358,31 +359,74 @@ async function renderDetailInline(id, data, container){
       </div>
       <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:8px;">Clique sur "Tirer un gagnant" quand tu es prêt.</div>
 
-      <h4 class="display" style="font-size:16px;margin:20px 0 10px;">Participants</h4>
-      <div class="participants-list">Chargement…</div>
+      <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <h4 class="display" style="margin:0;font-size:16px;">Participants <span class="live-count">(0)</span></h4>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary copy-list-btn" style="font-size:12px;padding:8px 10px;">📋 Copier</button>
+          <button class="btn btn-secondary csv-btn" style="font-size:12px;padding:8px 10px;">⬇️ CSV</button>
+        </div>
+      </div>
+      <div class="participants-list" style="margin-top:10px;">Chargement…</div>
     </div>
   `;
 
-  container.querySelector(".copy-btn").onclick = async () => {
-    const btn = container.querySelector(".copy-btn");
+  container.querySelector(".copy-link-btn").onclick = async () => {
+    const btn = container.querySelector(".copy-link-btn");
     try{ await navigator.clipboard.writeText(publicUrl); btn.textContent = "Copié !"; }
     catch{ container.querySelector(".link-input").select(); }
   };
 
-  const pSnap = await getDocs(query(collection(db,"participants"), where("restaurantId","==",id)));
-  const participants = pSnap.docs.map(d => d.data());
+  let participants = [];
 
-  const listEl = container.querySelector(".participants-list");
-  if (participants.length === 0){
-    listEl.innerHTML = `<p style="font-size:13px;color:var(--stone);">Personne n'a encore scanné le QR code.</p>`;
-  } else {
-    listEl.innerHTML = participants.map(p => `
-      <div class="participant-row">
-        <span style="font-weight:600;">${esc(p.prenom)}</span>
-        <span class="mono" style="color:var(--stone);">${esc(p.email)}</span>
-        <span style="color:${p.wantsPromo ? "var(--tomato)" : "var(--stone)"};">${p.wantsPromo ? "promo ok" : "résultat seul"}</span>
-      </div>`).join("");
+  function renderParticipantsList(){
+    const listEl = container.querySelector(".participants-list");
+    container.querySelector(".live-count").textContent = `(${participants.length})`;
+    if (participants.length === 0){
+      listEl.innerHTML = `<p style="font-size:13px;color:var(--stone);">Personne n'a encore scanné le QR code.</p>`;
+    } else {
+      listEl.innerHTML = participants.map(p => `
+        <div class="participant-row">
+          <span style="font-weight:600;">${esc(p.prenom)}</span>
+          <span class="mono" style="color:var(--stone);">${esc(p.email)}</span>
+          <span style="color:${p.wantsPromo ? "var(--tomato)" : "var(--stone)"};">${p.wantsPromo ? "promo ok" : "résultat seul"}</span>
+        </div>`).join("");
+    }
   }
+
+  const q = query(collection(db,"participants"), where("restaurantId","==",id));
+  const unsub = onSnapshot(q, (snap) => {
+    participants = snap.docs.map(d => d.data());
+    renderParticipantsList();
+  }, (err) => {
+    container.querySelector(".participants-list").innerHTML = `<p class="err">Erreur temps réel : ${esc(err?.message || String(err))}</p>`;
+  });
+  container._unsub = unsub;
+
+  container.querySelector(".copy-list-btn").onclick = async () => {
+    const btn = container.querySelector(".copy-list-btn");
+    if (participants.length === 0) { btn.textContent = "Vide"; setTimeout(()=>btn.textContent="📋 Copier",1200); return; }
+    const text = participants.map(p => `${p.prenom}\t${p.email}`).join("\n");
+    try{ await navigator.clipboard.writeText(text); btn.textContent = "Copié !"; setTimeout(()=>btn.textContent="📋 Copier",1500); }
+    catch{ btn.textContent = "Erreur copie"; }
+  };
+
+  container.querySelector(".csv-btn").onclick = () => {
+    if (participants.length === 0) return;
+    const header = "prenom,email,veut_resultat,veut_promo\n";
+    const rows = participants.map(p =>
+      [p.prenom, p.email, p.wantsResult ? "oui" : "non", p.wantsPromo ? "oui" : "non"]
+        .map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")
+    ).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `participants-${data.name.replace(/[^a-z0-9]+/gi,"-")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   container.querySelector(".draw-btn").onclick = () => {
     const box = container.querySelector(".winner-box");
