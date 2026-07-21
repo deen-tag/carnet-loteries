@@ -22,6 +22,7 @@ export default async function handler(req, res) {
 
   try {
     let totalRecipients = 0;
+    const ids = [];
     for (const chunk of chunks) {
       const r = await fetch("https://api.onesignal.com/notifications", {
         method: "POST",
@@ -45,8 +46,9 @@ export default async function handler(req, res) {
         return res.status(r.status).json({ error: data?.errors ? JSON.stringify(data.errors) : "Erreur OneSignal" });
       }
       totalRecipients += (typeof data.recipients === "number" ? data.recipients : 0);
+      if (data.id) ids.push(data.id);
     }
-    return res.status(200).json({ ok: true, recipients: totalRecipients, targeted: external_ids.length });
+    return res.status(200).json({ ok: true, recipients: totalRecipients, targeted: external_ids.length, notification_ids: ids });
   } catch (e) {
     return res.status(500).json({ error: e?.message || String(e) });
   }
