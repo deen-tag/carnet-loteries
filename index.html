@@ -118,7 +118,7 @@ async function renderPublic(id){
   $app.innerHTML = `
     <div style="width:100%;max-width:420px;">
       <div class="card" style="border-radius:18px 18px 4px 4px;">
-        <span class="stamp">Loterie</span>
+        <img src="logo.png" alt="Tiketo" style="height:32px;margin-bottom:12px;">
         <h1 class="display" style="font-size:30px;margin:12px 0 4px;">${esc(data.name)}</h1>
         <p style="color:var(--stone);font-size:14px;margin:0 0 20px;">
           À gagner : <strong style="color:var(--tomato);">${esc(data.prize)}</strong>
@@ -212,8 +212,7 @@ async function renderAdmin(){
   $app.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:26px;flex-wrap:wrap;gap:12px;">
       <div>
-        <span class="stamp" style="border-color:var(--mustard);color:var(--mustard);">Carnet</span>
-        <h1 class="display" style="font-size:32px;margin:10px 0 2px;">Loteries des commerçants</h1>
+        <img src="logo.png" alt="Tiketo" style="height:48px;margin-bottom:10px;">
         <p style="color:var(--stone);font-size:14px;margin:0;">Un QR code par commerçant, un seul site pour tous.</p>
       </div>
       <button class="btn btn-primary" id="btn-add">+ Nouveau commerçant</button>
