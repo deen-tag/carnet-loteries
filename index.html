@@ -319,29 +319,23 @@ async function renderPublic(id){
             email: email || "(non renseigné)"
           };
 
-          let lastErr = null;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-              await OneSignal.User.addTags(tagPayload);
-              lastErr = null;
-              break;
-            } catch (e) {
-              lastErr = e;
-              await new Promise(r => setTimeout(r, 500));
-            }
+          // tentative côté client (best-effort, peut échouer en silence)
+          try { await OneSignal.User.addTags(tagPayload); } catch(e) { console.warn("[tiketo] addTags client a échoué (non bloquant):", e); }
+
+          // pose fiable des tags DEPUIS LE SERVEUR via l'API REST OneSignal :
+          // le SDK client peut perdre l'envoi en silence, l'appel serveur non.
+          const setTagsRes = await fetch("/api/set-tags", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ external_id: externalId, tags: tagPayload })
+          });
+          const setTagsData = await setTagsRes.json().catch(() => ({}));
+          if (!setTagsRes.ok) {
+            throw new Error(setTagsData?.error || "échec de la pose des tags côté serveur");
           }
-          if (lastErr) throw lastErr;
 
-          // laisse le temps à la requête réseau interne de partir avant
-          // qu'on considère que c'est bon, puis vérifie par relecture.
-          await new Promise(r => setTimeout(r, 800));
-          let verified = {};
-          try { verified = await OneSignal.User.getTags(); } catch(_) {}
-
-          pushBtn.textContent = verified && verified.resto_id
-            ? "🔔 Notifications activées, merci !"
-            : "🔔 Activé (vérifie dans qq secondes)";
-          console.log("[tiketo] push opt-in, subId=", subId, "externalId=", externalId, "tags envoyés=", tagPayload, "tags relus=", verified);
+          pushBtn.textContent = "🔔 Notifications activées, merci !";
+          console.log("[tiketo] push opt-in ok, subId=", subId, "externalId=", externalId, "tags envoyés=", tagPayload);
         } catch (e) {
           pushBtn.disabled = false;
           let msg = (e && e.message) ? e.message : "";
