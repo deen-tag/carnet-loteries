@@ -351,6 +351,14 @@ async function renderDetailInline(id, data, container){
       </div>
       <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:8px;">Clique sur "Tirer un gagnant" quand tu es prêt.</div>
 
+      <div style="margin-top:20px;">
+        <h4 class="display" style="margin:0 0 10px;font-size:16px;">📣 Envoyer une notification</h4>
+        <input type="text" class="push-title" placeholder="Titre (ex: Résultat du tirage !)" style="margin-bottom:8px;">
+        <textarea class="push-message" placeholder="Message (ex: Le gagnant est... Merci à tous !)" rows="2" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid var(--paper2);font-family:'Inter',sans-serif;font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
+        <button class="btn btn-primary send-push-btn" style="width:100%;">Envoyer aux abonnés de ce commerçant</button>
+        <p class="push-status" style="font-size:12px;color:var(--stone);margin-top:8px;"></p>
+      </div>
+
       <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <h4 class="display" style="margin:0;font-size:16px;">Participants <span class="live-count">(0)</span></h4>
         <div style="display:flex;gap:8px;">
@@ -418,6 +426,32 @@ async function renderDetailInline(id, data, container){
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  container.querySelector(".send-push-btn").onclick = async () => {
+    const btn = container.querySelector(".send-push-btn");
+    const statusEl = container.querySelector(".push-status");
+    const title = container.querySelector(".push-title").value.trim();
+    const message = container.querySelector(".push-message").value.trim();
+    if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "push-status err"; return; }
+    btn.disabled = true; btn.textContent = "Envoi…";
+    statusEl.textContent = ""; statusEl.className = "push-status";
+    try {
+      const r = await fetch("/api/send-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resto_id: id, title, message })
+      });
+      const out = await r.json();
+      if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
+      statusEl.textContent = `Envoyé à ${out.recipients} abonné(s) ✅`;
+      statusEl.style.color = "var(--tomato)";
+    } catch (e) {
+      statusEl.textContent = "Erreur : " + (e?.message || String(e));
+      statusEl.className = "push-status err";
+    } finally {
+      btn.disabled = false; btn.textContent = "Envoyer aux abonnés de ce commerçant";
+    }
   };
 
   container.querySelector(".draw-btn").onclick = () => {
