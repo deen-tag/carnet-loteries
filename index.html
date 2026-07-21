@@ -246,6 +246,22 @@ async function renderPublic(id){
       await addDoc(collection(db,"participants"), {
         restaurantId: id, prenom, email, wantsResult: true, wantsPromo, ts: serverTimestamp()
       });
+
+      // ancre l'identité OneSignal dès que possible (dès qu'on connaît
+      // l'email), pour laisser le temps au SDK de créer son "identity model"
+      // avant qu'on lui demande la permission push / les tags juste après.
+      let OneSignalEarly = window.__oneSignalReady;
+      let earlyTries = 0;
+      while (!OneSignalEarly && earlyTries < 20) {
+        await new Promise(r => setTimeout(r, 300));
+        OneSignalEarly = window.__oneSignalReady;
+        earlyTries++;
+      }
+      if (OneSignalEarly) {
+        try { await OneSignalEarly.login(email.toLowerCase()); }
+        catch(e) { console.warn("[tiketo] login() anticipé a échoué (non bloquant):", e); }
+      }
+
       const formWrap = document.getElementById("ticket-form");
       formWrap.innerHTML = `
         <div style="text-align:center;padding:6px 0 4px;">
@@ -291,11 +307,10 @@ async function renderPublic(id){
             waitTries++;
           }
 
-          // ancre un utilisateur OneSignal connu (external ID) AVANT de poser
-          // les tags : sans ça, le SDK v16 peut perdre l'envoi des tags en
-          // silence si la session se termine avant la sync serveur.
+          // ancre l'identité si le login anticipé n'a pas eu lieu (ex: était
+          // hors ligne juste après la validation du ticket) — sinon no-op.
           const externalId = (email || `resto-${id}-${Date.now()}`).toLowerCase();
-          await OneSignal.login(externalId);
+          try { await OneSignal.login(externalId); } catch(e) { console.warn("[tiketo] login() de secours a échoué:", e); }
 
           const tagPayload = {
             resto_id: id,
@@ -329,7 +344,9 @@ async function renderPublic(id){
           console.log("[tiketo] push opt-in, subId=", subId, "externalId=", externalId, "tags envoyés=", tagPayload, "tags relus=", verified);
         } catch (e) {
           pushBtn.disabled = false;
-          const msg = (e && e.message) ? e.message : String(e);
+          let msg = (e && e.message) ? e.message : "";
+          if (!msg) { try { msg = JSON.stringify(e); } catch(_) { msg = ""; } }
+          if (!msg || msg === "{}" || msg === "undefined") msg = "problème inconnu, réessaie";
           pushBtn.textContent = ("Erreur : " + msg).slice(0, 70);
           console.error("[tiketo] push opt-in failed:", e);
         }
