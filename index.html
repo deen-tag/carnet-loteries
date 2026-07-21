@@ -252,7 +252,7 @@ async function renderPublic(id){
           <div class="ticket-no" style="font-size:15px;color:var(--gold);animation:stampIn .5s ease;">✓ ENREGISTRÉ</div>
           <p class="display" style="font-size:20px;margin:6px 0 4px;">Ticket confirmé !</p>
           <p style="color:var(--stone);font-size:14px;margin-bottom:18px;font-family:'IBM Plex Mono',monospace;">Résultat annoncé par email si tu gagnes.</p>
-          <button class="btn btn-primary" style="width:100%;" id="push-btn">🔔 Activer les notifications</button>
+          <button class="btn btn-primary" style="width:100%;" id="push-btn">🔔 Accepter les notifications pour recevoir la réponse plus vite</button>
         </div>`;
 
       document.getElementById("push-btn").onclick = async () => {
@@ -275,16 +275,54 @@ async function renderPublic(id){
         }
         try {
           await OneSignal.Notifications.requestPermission();
-          await OneSignal.User.addTags({
+
+          if (OneSignal.Notifications.permission !== true) {
+            pushBtn.disabled = false;
+            pushBtn.textContent = "Notifications refusées dans le navigateur";
+            return;
+          }
+
+          // attend que l'abonnement push soit vraiment créé côté OneSignal
+          // avant de poser les tags, sinon addTags peut partir dans le vide.
+          let subId = OneSignal.User.PushSubscription.id;
+          let waitTries = 0;
+          while (!subId && waitTries < 15) {
+            await new Promise(r => setTimeout(r, 400));
+            subId = OneSignal.User.PushSubscription.id;
+            waitTries++;
+          }
+
+          const tagPayload = {
             resto_id: id,
             resto_nom: data.name,
             prenom: prenom || "(non renseigné)",
             email: email || "(non renseigné)"
-          });
-          pushBtn.textContent = "🔔 Notifications activées, merci !";
+          };
+
+          // retente jusqu'à 3 fois : l'appel réseau interne peut échouer
+          // silencieusement juste après la création de l'abonnement.
+          let lastErr = null;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              await OneSignal.User.addTags(tagPayload);
+              lastErr = null;
+              break;
+            } catch (e) {
+              lastErr = e;
+              await new Promise(r => setTimeout(r, 500));
+            }
+          }
+          if (lastErr) throw lastErr;
+
+          pushBtn.textContent = subId
+            ? "🔔 Notifications activées, merci !"
+            : "🔔 Activé (abonnement en cours de sync…)";
+          console.log("[tiketo] push opt-in ok, subId=", subId, "tags=", tagPayload);
         } catch (e) {
           pushBtn.disabled = false;
-          pushBtn.textContent = "Réessayer : activer les notifications";
+          const msg = (e && e.message) ? e.message : String(e);
+          pushBtn.textContent = ("Erreur : " + msg).slice(0, 70);
+          console.error("[tiketo] push opt-in failed:", e);
         }
       };
     }catch(e){
