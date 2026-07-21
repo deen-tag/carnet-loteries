@@ -543,6 +543,17 @@ async function renderDetailInline(id, data, container){
     <div class="perf" style="margin:22px -20px;"></div>
 
     <div>
+      <h4 class="display" style="margin:0 0 4px;font-size:16px;">🎁 Envoyer une promo</h4>
+      <p class="promo-count" style="font-size:12px;color:var(--stone);margin:0 0 10px;font-family:'IBM Plex Mono',monospace;">Chargement…</p>
+      <input type="text" class="promo-title" placeholder="Titre (ex: -20% ce week-end !)" style="margin-bottom:8px;">
+      <textarea class="promo-message" placeholder="Message (ex: Reviens nous voir, offre valable jusqu'à dimanche)" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
+      <button class="btn btn-primary send-promo-btn" style="width:100%;">Envoyer aux clients qui ont accepté les offres</button>
+      <p class="promo-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
+    </div>
+
+    <div class="perf" style="margin:22px -20px;"></div>
+
+    <div>
       <h4 class="display" style="margin:0 0 10px;font-size:16px;">📣 Envoyer une notification</h4>
       <input type="text" class="push-title" placeholder="Titre (ex: Résultat du tirage !)" style="margin-bottom:8px;">
       <textarea class="push-message" placeholder="Message (ex: Le gagnant est... Merci à tous !)" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
@@ -578,6 +589,8 @@ async function renderDetailInline(id, data, container){
   function renderParticipantsList(){
     const listEl = container.querySelector(".participants-list");
     container.querySelector(".live-count").textContent = `(${participants.length})`;
+    const promoCount = participants.filter(p => p.wantsPromo && p.email).length;
+    container.querySelector(".promo-count").textContent = `${promoCount} client(s) ont accepté de recevoir des offres.`;
     if (participants.length === 0){
       listEl.innerHTML = `<p style="font-size:13px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">Personne n'a encore scanné le QR code.</p>`;
     } else {
@@ -624,6 +637,39 @@ async function renderDetailInline(id, data, container){
     a.remove();
     URL.revokeObjectURL(url);
     toast("CSV téléchargé");
+  };
+
+  container.querySelector(".send-promo-btn").onclick = async () => {
+    const btn = container.querySelector(".send-promo-btn");
+    const statusEl = container.querySelector(".promo-status");
+    const title = container.querySelector(".promo-title").value.trim();
+    const message = container.querySelector(".promo-message").value.trim();
+    if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "promo-status err"; return; }
+
+    const targets = [...new Set(
+      participants.filter(p => p.wantsPromo && p.email).map(p => p.email.toLowerCase())
+    )];
+    if (targets.length === 0) { statusEl.textContent = "Personne n'a encore accepté de recevoir des offres."; statusEl.className = "promo-status err"; return; }
+
+    btn.disabled = true; btn.textContent = "Envoi…";
+    statusEl.textContent = ""; statusEl.className = "promo-status";
+    try {
+      const r = await fetch("/api/send-promo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ external_ids: targets, title, message })
+      });
+      const out = await r.json();
+      if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
+      statusEl.textContent = `Envoyée à ${out.recipients} client(s) sur ${out.targeted} ciblé(s) ✅`;
+      statusEl.style.color = "var(--stamp)";
+      toast("Promo envoyée");
+    } catch (e) {
+      statusEl.textContent = "Erreur : " + (e?.message || String(e));
+      statusEl.className = "promo-status err";
+    } finally {
+      btn.disabled = false; btn.textContent = "Envoyer aux clients qui ont accepté les offres";
+    }
   };
 
   container.querySelector(".send-push-btn").onclick = async () => {
