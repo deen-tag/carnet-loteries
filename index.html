@@ -41,35 +41,6 @@
   .hidden{display:none !important;}
   a{color:var(--tomato);}
   .participant-row{display:flex;justify-content:space-between;font-size:13px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid var(--paper2);margin-bottom:6px;flex-wrap:wrap;gap:6px;}
-
-  /* ===== Tiketo V2 UI ===== */
-  body{background:#f7f4ee;min-height:100vh;}
-  #app{max-width:1120px !important;padding:28px 24px 56px !important;}
-  .card{background:#fff;border:1px solid #ece7dd;border-radius:20px;padding:24px;box-shadow:0 8px 30px rgba(22,40,28,.06);}
-  .btn{border-radius:12px;padding:12px 18px;transition:transform .15s,box-shadow .15s,opacity .15s;}
-  .btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(22,40,28,.10);}
-  .btn-primary{background:var(--ink);}
-  .btn-primary:hover{background:#243d2b;}
-  .btn-secondary{background:#fff;border:1px solid #ddd6c9;}
-  input[type=text],input[type=email],textarea{border:1px solid #ddd6c9 !important;background:#fff;min-height:44px;}
-  input:focus,textarea:focus{outline:none;border-color:var(--tomato) !important;box-shadow:0 0 0 3px rgba(193,68,14,.10);}
-  .stamp{border-color:var(--mustard);color:#7b5a00;background:#fff9e9;font-size:10px;font-weight:700;}
-  .dashboard-shell{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:start;}
-  .sidebar{position:sticky;top:20px;background:var(--ink);color:#fff;border-radius:22px;padding:22px;min-height:calc(100vh - 80px);}
-  .sidebar .nav-item{display:block;padding:11px 12px;border-radius:10px;color:#dce8df;font-size:13px;margin:5px 0;}
-  .sidebar .nav-item.active{background:rgba(255,255,255,.12);color:#fff;font-weight:700;}
-  .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px;}
-  .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
-  .stat-card{background:#fff;border:1px solid #ece7dd;border-radius:16px;padding:18px;}
-  .stat-label{font-size:12px;color:var(--stone);font-weight:600;}
-  .stat-value{font-family:'Fraunces',serif;font-size:30px;margin-top:7px;}
-  .resto-header{padding:20px !important;}
-  .resto-header:hover{background:#fffaf2;}
-  .resto-body{background:#fcfaf6;border-top:1px solid #eee8dc;}
-  .participant-row{padding:11px 12px;border-color:#ece7dd;}
-  @media(max-width:800px){.dashboard-shell{grid-template-columns:1fr}.sidebar{position:static;min-height:auto}.stats-grid{grid-template-columns:1fr 1fr}.topbar{align-items:flex-start;flex-direction:column}}
-  @media(max-width:520px){#app{padding:18px 14px 40px !important}.stats-grid{grid-template-columns:1fr}.card{padding:18px}.resto-header{padding:16px !important}}
-
 </style>
 </head>
 <body>
@@ -232,38 +203,15 @@ async function renderPublic(id){
 // ================= ADMIN DASHBOARD =================
 async function renderAdmin(){
   $app.innerHTML = `
-    <div class="dashboard-shell">
-      <aside class="sidebar">
-        <img src="logo.png" alt="Tiketo" style="height:42px;max-width:150px;object-fit:contain;margin-bottom:28px;filter:brightness(0) invert(1);">
-        <div class="nav-item active">📊 Tableau de bord</div>
-        <div class="nav-item">🎁 Mes concours</div>
-        <div class="nav-item">👥 Participants</div>
-        <div class="nav-item">⚙️ Paramètres</div>
-        <div style="margin-top:auto;padding-top:40px;font-size:11px;color:#9fb0a3;line-height:1.5;">
-          Tiketo transforme chaque QR code en expérience client.
-        </div>
-      </aside>
-      <main>
-        <div class="topbar">
-          <div>
-            <div class="stamp">ESPACE COMMERÇANT</div>
-            <h1 class="display" style="font-size:34px;margin:10px 0 4px;">Bonjour 👋</h1>
-            <p style="color:var(--stone);font-size:14px;margin:0;">Gérez vos concours et suivez vos participations.</p>
-          </div>
-          <button class="btn btn-primary" id="btn-add">+ Créer un concours</button>
-        </div>
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-label">COMMERCES</div><div class="stat-value" id="stat-restos">—</div></div>
-          <div class="stat-card"><div class="stat-label">PARTICIPATIONS</div><div class="stat-value" id="stat-participants">—</div></div>
-          <div class="stat-card"><div class="stat-label">CONCOURS ACTIFS</div><div class="stat-value" id="stat-active">—</div></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 12px;">
-          <div><h2 class="display" style="font-size:24px;margin:0;">Mes concours</h2><p style="color:var(--stone);font-size:13px;margin:4px 0 0;">Chaque concours possède son propre QR code.</p></div>
-        </div>
-        <div id="list"><p style="color:var(--stone);">Chargement…</p></div>
-        <div id="detail"></div>
-      </main>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:26px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <img src="logo.png" alt="Tiketo" style="height:48px;margin-bottom:10px;">
+        <p style="color:var(--stone);font-size:14px;margin:0;">Un QR code par commerçant, un seul site pour tous.</p>
+      </div>
+      <button class="btn btn-primary" id="btn-add">+ Nouveau commerçant</button>
     </div>
+    <div id="list" class="grid"><p style="color:var(--stone);">Chargement…</p></div>
+    <div id="detail"></div>
   `;
   document.getElementById("btn-add").onclick = openAddModal;
   await loadList();
@@ -281,12 +229,6 @@ async function loadList(){
   ]);
   const counts = {};
   pSnap.forEach(d => { const rid = d.data().restaurantId; counts[rid] = (counts[rid]||0)+1; });
-  const statR = document.getElementById("stat-restos");
-  const statP = document.getElementById("stat-participants");
-  const statA = document.getElementById("stat-active");
-  if(statR) statR.textContent = rSnap.size;
-  if(statP) statP.textContent = pSnap.size;
-  if(statA) statA.textContent = rSnap.size;
 
   if (rSnap.empty){
     listEl.innerHTML = `<div class="card" style="text-align:center;">
