@@ -129,77 +129,70 @@ async function renderPublic(id){
           <input type="text" id="f-prenom" placeholder="Ton prénom" style="margin-bottom:16px;">
           <label class="field">EMAIL</label>
           <input type="email" id="f-email" placeholder="ton@email.com" style="margin-bottom:16px;">
-          <label style="display:flex;gap:10px;font-size:13px;margin-bottom:10px;cursor:pointer;">
-            <input type="checkbox" id="f-result"> Je veux connaître le résultat du tirage (obligatoire)
-          </label>
           <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:18px;cursor:pointer;">
             <input type="checkbox" id="f-promo"> J'accepte de recevoir des offres de ${esc(data.name)} (facultatif)
           </label>
           <p id="f-err" class="err"></p>
           <button class="btn btn-primary" style="width:100%;" id="f-submit">Valider mon ticket</button>
-          <button class="btn btn-secondary" style="width:100%;margin-top:10px;" id="push-btn">🔔 Activer les notifications de ${esc(data.name)}</button>
         </div>
       </div>
     </div>`;
 
-  document.getElementById("push-btn").onclick = async () => {
-    const pushBtn = document.getElementById("push-btn");
-    pushBtn.disabled = true; pushBtn.textContent = "…";
-
-    let OneSignal = window.__oneSignalReady;
-    let tries = 0;
-    while (!OneSignal && tries < 20) {
-      await new Promise(r => setTimeout(r, 300));
-      OneSignal = window.__oneSignalReady;
-      tries++;
-    }
-    if (!OneSignal) {
-      pushBtn.disabled = false;
-      pushBtn.textContent = window.__oneSignalInitError
-        ? ("Erreur : " + window.__oneSignalInitError).slice(0, 60)
-        : "Notifications indisponibles, réessaie";
-      return;
-    }
-    try {
-      await OneSignal.Notifications.requestPermission();
-      const prenomVal = document.getElementById("f-prenom").value.trim();
-      const emailVal = document.getElementById("f-email").value.trim();
-      await OneSignal.User.addTags({
-        resto_id: id,
-        resto_nom: data.name,
-        prenom: prenomVal || "(non renseigné)",
-        email: emailVal || "(non renseigné)"
-      });
-      pushBtn.textContent = "🔔 Notifications activées";
-    } catch (e) {
-      pushBtn.disabled = false;
-      pushBtn.textContent = "Réessayer : activer les notifications";
-    }
-  };
-
   document.getElementById("f-submit").onclick = async () => {
     const prenom = document.getElementById("f-prenom").value.trim();
     const email = document.getElementById("f-email").value.trim();
-    const wantsResult = document.getElementById("f-result").checked;
     const wantsPromo = document.getElementById("f-promo").checked;
     const errEl = document.getElementById("f-err");
     errEl.textContent = "";
 
     if (!prenom) return errEl.textContent = "Ton prénom manque à l'appel.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return errEl.textContent = "Cette adresse email ne semble pas valide.";
-    if (!wantsResult) return errEl.textContent = "Coche la case pour connaître le résultat — c'est obligatoire.";
 
     const btn = document.getElementById("f-submit");
     btn.disabled = true; btn.textContent = "Envoi…";
     try{
       await addDoc(collection(db,"participants"), {
-        restaurantId: id, prenom, email, wantsResult, wantsPromo, ts: serverTimestamp()
+        restaurantId: id, prenom, email, wantsResult: true, wantsPromo, ts: serverTimestamp()
       });
       document.getElementById("ticket-form").innerHTML = `
         <div style="text-align:center;padding:10px 0 20px;">
           <p class="display" style="font-size:20px;">🎉 Ticket enregistré !</p>
-          <p style="color:var(--stone);font-size:14px;">Résultat annoncé par email si tu gagnes.</p>
+          <p style="color:var(--stone);font-size:14px;margin-bottom:18px;">Résultat annoncé par email si tu gagnes.</p>
+          <button class="btn btn-primary" style="width:100%;" id="push-btn">🔔 Accepter les notifications pour recevoir la réponse plus vite</button>
         </div>`;
+
+      document.getElementById("push-btn").onclick = async () => {
+        const pushBtn = document.getElementById("push-btn");
+        pushBtn.disabled = true; pushBtn.textContent = "…";
+
+        let OneSignal = window.__oneSignalReady;
+        let tries = 0;
+        while (!OneSignal && tries < 20) {
+          await new Promise(r => setTimeout(r, 300));
+          OneSignal = window.__oneSignalReady;
+          tries++;
+        }
+        if (!OneSignal) {
+          pushBtn.disabled = false;
+          pushBtn.textContent = window.__oneSignalInitError
+            ? ("Erreur : " + window.__oneSignalInitError).slice(0, 60)
+            : "Notifications indisponibles, réessaie";
+          return;
+        }
+        try {
+          await OneSignal.Notifications.requestPermission();
+          await OneSignal.User.addTags({
+            resto_id: id,
+            resto_nom: data.name,
+            prenom: prenom || "(non renseigné)",
+            email: email || "(non renseigné)"
+          });
+          pushBtn.textContent = "🔔 Notifications activées, merci !";
+        } catch (e) {
+          pushBtn.disabled = false;
+          pushBtn.textContent = "Réessayer : activer les notifications";
+        }
+      };
     }catch(e){
       errEl.textContent = "Le ticket n'a pas pu être enregistré. Réessaie.";
       btn.disabled = false; btn.textContent = "Valider mon ticket";
@@ -387,7 +380,7 @@ async function renderDetailInline(id, data, container){
         <div class="participant-row">
           <span style="font-weight:600;">${esc(p.prenom)}</span>
           <span class="mono" style="color:var(--stone);">${esc(p.email)}</span>
-          <span style="color:${p.wantsPromo ? "var(--tomato)" : "var(--stone)"};">${p.wantsPromo ? "promo ok" : "résultat seul"}</span>
+          <span style="color:${p.wantsPromo ? "var(--tomato)" : "var(--stone)"};">${p.wantsPromo ? "promo ok" : ""}</span>
         </div>`).join("");
     }
   }
