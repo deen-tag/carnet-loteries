@@ -313,10 +313,7 @@ async function renderPublic(id){
           try { await OneSignal.login(externalId); } catch(e) { console.warn("[tiketo] login() de secours a échoué:", e); }
 
           const tagPayload = {
-            resto_id: id,
-            resto_nom: data.name,
-            prenom: prenom || "(non renseigné)",
-            email: email || "(non renseigné)"
+            resto_id: id
           };
 
           // tentative côté client (best-effort, peut échouer en silence)
