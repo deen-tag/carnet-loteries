@@ -24,6 +24,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         app_id: APP_ID,
+        target_channel: "push",
         headings: { en: title, fr: title },
         contents: { en: message, fr: message },
         filters: [
@@ -36,8 +37,11 @@ export default async function handler(req, res) {
     if (!r.ok) {
       return res.status(r.status).json({ error: data?.errors ? JSON.stringify(data.errors) : "Erreur OneSignal" });
     }
-    return res.status(200).json({ ok: true, recipients: data.recipients ?? 0, id: data.id });
+    if (!data.id) {
+      return res.status(200).json({ ok: true, recipients: 0, warning: "Aucun destinataire trouvé pour ce tag." });
+    }
+    return res.status(200).json({ ok: true, recipients: data.recipients ?? "?", id: data.id });
   } catch (e) {
     return res.status(500).json({ error: e?.message || String(e) });
   }
-}
+                                 }
