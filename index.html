@@ -171,10 +171,38 @@ if (configMissing()) {
         (Console Firebase → Paramètres du projet → Tes applications → SDK config). Voir le README.
       </p>
     </div>`;
+} else if (params.get("about") === "1") {
+  renderAbout();
 } else if (restoId) {
   renderPublic(restoId);
 } else {
   renderAdmin();
+}
+
+// ================= PAGE D'EXPLICATION ("C'est quoi Tiketo ?") =================
+function renderAbout(){
+  document.body.style.background = "var(--ink)";
+  $app.style.display="flex"; $app.style.alignItems="center"; $app.style.justifyContent="center"; $app.style.minHeight="100vh";
+  $app.innerHTML = `
+    <div style="width:100%;max-width:420px;" class="anim-rise">
+      <div class="card" style="border-radius:8px;">
+        <img src="logo.png" alt="Tiketo" style="height:30px;margin-bottom:18px;">
+        <h1 class="display" style="font-size:24px;margin:0 0 14px;">C'est quoi Tiketo ?</h1>
+        <p style="font-size:14px;line-height:1.7;color:var(--ink);margin:0 0 12px;">
+          Tiketo est un simple outil utilisé par des commerces locaux (restaurants, cafés, boutiques...)
+          pour organiser des tirages au sort en salle, sans application à installer.
+        </p>
+        <p style="font-size:14px;line-height:1.7;color:var(--stone);margin:0 0 12px;font-family:'IBM Plex Mono',monospace;">
+          Le principe : le commerce affiche un QR code, tu le scannes, tu laisses ton prénom et ton email
+          pour participer au tirage — c'est tout. Aucune app, aucun compte à créer.
+        </p>
+        <p style="font-size:14px;line-height:1.7;color:var(--stone);margin:0 0 20px;font-family:'IBM Plex Mono',monospace;">
+          Tes informations ne servent qu'à ce commerce précis, pour te contacter en cas de gain ou t'envoyer
+          ses offres si tu l'as accepté. Rien n'est revendu ni partagé ailleurs.
+        </p>
+        <a href="javascript:history.back()" class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;">← Retour</a>
+      </div>
+    </div>`;
 }
 
 // ================= PUBLIC TICKET PAGE =================
@@ -196,6 +224,24 @@ async function renderPublic(id){
   }
   const data = r.data();
   const ticketNo = String(id).slice(0,4).toUpperCase().replace(/[^A-Z0-9]/g,"0");
+  const isPromoClick = params.get("promo") === "1";
+
+  if (isPromoClick) {
+    $app.innerHTML = `
+      <div style="width:100%;max-width:400px;" class="anim-rise">
+        <div class="card" style="border-radius:8px;padding:0;overflow:hidden;">
+          <div style="padding:20px 24px 4px;display:flex;justify-content:space-between;align-items:flex-start;">
+            <img src="logo.png" alt="Tiketo" style="height:26px;">
+            <span class="ticket-no" style="font-size:22px;color:var(--stamp);">N° ${esc(ticketNo)}</span>
+          </div>
+          <div style="padding:8px 24px 28px;text-align:center;">
+            <h1 class="display" style="font-size:26px;margin:20px 0 8px;">${esc(data.name)}</h1>
+            <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">Merci d'être abonné(e) aux offres. À bientôt !</p>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
 
   $app.innerHTML = `
     <div style="width:100%;max-width:400px;" class="anim-rise">
@@ -226,6 +272,9 @@ async function renderPublic(id){
             <p id="f-err" class="err"></p>
             <button class="btn btn-primary" style="width:100%;" id="f-submit">Valider mon ticket</button>
           </div>
+        </div>
+        <div style="text-align:center;padding:0 24px 18px;">
+          <a href="?about=1" style="font-size:11px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">C'est quoi Tiketo ?</a>
         </div>
       </div>
     </div>`;
@@ -657,13 +706,32 @@ async function renderDetailInline(id, data, container){
       const r = await fetch("/api/send-promo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ external_ids: targets, title, message })
+        body: JSON.stringify({ external_ids: targets, title, message, resto_id: id, origin: window.location.origin })
       });
       const out = await r.json();
       if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
-      statusEl.textContent = `Envoyée à ${out.recipients} client(s) sur ${out.targeted} ciblé(s) ✅`;
-      statusEl.style.color = "var(--stamp)";
+      statusEl.textContent = `Envoyée à ${targets.length} client(s) — vérification en cours…`;
+      statusEl.style.color = "var(--stone)";
       toast("Promo envoyée");
+
+      if (out.notification_ids && out.notification_ids.length) {
+        setTimeout(async () => {
+          try {
+            let successful = 0;
+            for (const nid of out.notification_ids) {
+              const chk = await fetch("/api/check-notification", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ notification_id: nid })
+              });
+              const chkData = await chk.json();
+              if (chk.ok && typeof chkData.successful === "number") successful += chkData.successful;
+            }
+            statusEl.textContent = `Livrée à ${successful} client(s) sur ${targets.length} ciblé(s) ✅`;
+            statusEl.style.color = "var(--stamp)";
+          } catch(_) { /* on laisse le message provisoire si la vérif échoue */ }
+        }, 4000);
+      }
     } catch (e) {
       statusEl.textContent = "Erreur : " + (e?.message || String(e));
       statusEl.className = "promo-status err";
@@ -684,13 +752,29 @@ async function renderDetailInline(id, data, container){
       const r = await fetch("/api/send-push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resto_id: id, title, message })
+        body: JSON.stringify({ resto_id: id, title, message, origin: window.location.origin })
       });
       const out = await r.json();
       if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
-      statusEl.textContent = `Envoyé à ${out.recipients} abonné(s) ✅`;
-      statusEl.style.color = "var(--stamp)";
+      statusEl.textContent = "Envoyée — vérification en cours…";
+      statusEl.style.color = "var(--stone)";
       toast("Notification envoyée");
+
+      if (out.id) {
+        setTimeout(async () => {
+          try {
+            const chk = await fetch("/api/check-notification", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ notification_id: out.id })
+            });
+            const chkData = await chk.json();
+            const successful = (chk.ok && typeof chkData.successful === "number") ? chkData.successful : out.recipients;
+            statusEl.textContent = `Livrée à ${successful} abonné(s) ✅`;
+            statusEl.style.color = "var(--stamp)";
+          } catch(_) { /* on laisse le message provisoire si la vérif échoue */ }
+        }, 4000);
+      }
     } catch (e) {
       statusEl.textContent = "Erreur : " + (e?.message || String(e));
       statusEl.className = "push-status err";
@@ -718,6 +802,13 @@ async function renderDetailInline(id, data, container){
           <p class="mono" style="font-size:13px;color:var(--stone);margin:0;">${esc(w.email)}</p>
         </div>`;
         confettiBurst(box.querySelector(".winner-reveal"));
+
+        // pré-remplit le message de notif avec un texte prêt à l'emploi,
+        // modifiable avant l'envoi.
+        const titleEl = container.querySelector(".push-title");
+        const msgEl = container.querySelector(".push-message");
+        if (!titleEl.value.trim()) titleEl.value = `Résultat du tirage — ${data.name}`;
+        if (!msgEl.value.trim()) msgEl.value = `Félicitations ${w.prenom} ! Tu as gagné : ${data.prize}. Passe le récupérer chez ${data.name} 🎉`;
       }
     }, 90);
   };
