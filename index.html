@@ -85,6 +85,12 @@
   .participant-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:9px 12px;background:#fff;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;flex-wrap:wrap;gap:6px;font-family:'IBM Plex Mono',monospace;animation:rise .25s ease both;}
   .history-row{padding:12px 14px;background:#fff;border-radius:3px;border:1px solid var(--line);margin-bottom:8px;}
 
+  details.section > summary{cursor:pointer;list-style:none;font-family:'Fraunces',serif;font-size:16px;font-weight:600;display:flex;justify-content:space-between;align-items:center;padding:4px 0;}
+  details.section > summary::-webkit-details-marker{display:none;}
+  details.section > summary::after{content:"▾";font-family:'IBM Plex Mono',monospace;color:var(--stone);font-size:13px;transition:transform .15s ease;}
+  details.section[open] > summary::after{transform:rotate(180deg);}
+  details.section{margin:4px 0;}
+
   .ticket-no{font-family:'Big Shoulders Stencil',sans-serif;font-weight:800;line-height:.85;color:var(--ink);}
 
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -120,7 +126,8 @@ const firebaseConfig = {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail
+  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword, verifyBeforeUpdateEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, getDocs, getDoc, query, where,
@@ -393,12 +400,15 @@ async function renderPublic(id){
     btn.disabled = true; btn.textContent = "Envoi…";
     try{
       // évite un doublon pour CE tirage précis (email = clé unique par round)
-      const dupSnap = await getDocs(query(
-        collection(db,"participants"),
-        where("drawId","==",drawId),
-        where("email","==",emailLower)
-      ));
-      if (dupSnap.empty) {
+      // — vérif faite côté serveur car la lecture directe de "participants"
+      // n'est plus publique (fuite d'emails sinon).
+      const dupRes = await fetch("/api/check-participant", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ drawId, email: emailLower })
+      });
+      const dupData = await dupRes.json().catch(() => ({}));
+      const already = !!(dupRes.ok && dupData.exists);
+      if (!already) {
         await addDoc(collection(db,"participants"), {
           drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, ts: serverTimestamp()
         });
@@ -430,7 +440,6 @@ async function renderPublic(id){
       }
 
       const formWrap = document.getElementById("ticket-form");
-      const already = !dupSnap.empty;
       formWrap.innerHTML = `
         <div style="text-align:center;padding:6px 0 4px;">
           <div class="ticket-no" style="font-size:15px;color:var(--gold);animation:stampIn .5s ease;">✓ ENREGISTRÉ</div>
@@ -527,6 +536,7 @@ async function renderAdmin(user){
         </p>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-start;">
+        <button class="btn btn-secondary" id="btn-account" style="font-size:12px;padding:8px 10px;">⚙️ Mon compte</button>
         <button class="btn btn-secondary" id="btn-logout" style="font-size:12px;padding:8px 10px;">Déconnexion</button>
         ${isSuperAdmin ? `<button class="btn btn-primary" id="btn-add">+ Nouveau commerçant</button>` : ""}
       </div>
@@ -540,6 +550,7 @@ async function renderAdmin(user){
   `;
   const addBtn = document.getElementById("btn-add");
   if (addBtn) addBtn.onclick = openAddModal;
+  document.getElementById("btn-account").onclick = () => openAccountModal(user);
   document.getElementById("btn-logout").onclick = () => signOut(auth);
   document.getElementById("search-input").oninput = (e) => renderList(e.target.value);
   await loadList(user, isSuperAdmin);
@@ -564,7 +575,7 @@ async function loadList(user, isSuperAdmin){
   const myEmail = (user.email || "").toLowerCase();
   allRestos = rSnap.docs
     .map(d => ({ id: d.id, data: d.data() }))
-    .filter(({data}) => isSuperAdmin || (data.ownerEmail || "").toLowerCase() === myEmail);
+    .filter(({data}) => isSuperAdmin || data.ownerUid === user.uid || (!data.ownerUid && (data.ownerEmail || "").toLowerCase() === myEmail));
 
   document.getElementById("stats-bar").innerHTML =
     statChip(isSuperAdmin ? "Commerçants" : "Ton commerce", allRestos.length) + statChip("Clients", allRestos.reduce((s,{id}) => s + (allClientCounts[id]||0), 0));
@@ -606,7 +617,7 @@ function renderList(filterText){
             <h3 class="display" style="font-size:19px;margin:8px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(data.name)}</h3>
           </div>
         </div>
-        <button class="btn btn-secondary del-btn" style="padding:8px 12px;flex-shrink:0;">🗑️</button>
+        <button class="btn btn-secondary del-btn ${currentIsSuperAdmin ? "" : "hidden"}" style="padding:8px 12px;flex-shrink:0;">🗑️</button>
       </div>
       <div class="resto-body" style="display:none;padding:0 20px 20px;"></div>
     `;
@@ -629,9 +640,24 @@ function renderList(filterText){
 
     delBtn.onclick = async (ev) => {
       ev.stopPropagation();
-      if (!confirm(`Supprimer "${data.name}" ? Cette action est définitive.`)) return;
+      if (!confirm(`Supprimer "${data.name}" ? Cette action est définitive et supprime aussi tous ses tirages et clients.`)) return;
       delBtn.disabled = true; delBtn.textContent = "…";
       try {
+        // nettoyage en cascade : sinon les tirages/participants/clients
+        // restent orphelins dans la base pour toujours
+        const [drawsSnap, clientsSnap] = await Promise.all([
+          getDocs(query(collection(db,"draws"), where("restaurantId","==",id))),
+          getDocs(query(collection(db,"clients"), where("restaurantId","==",id)))
+        ]);
+        const participantsSnaps = await Promise.all(
+          drawsSnap.docs.map(d => getDocs(query(collection(db,"participants"), where("drawId","==",d.id))))
+        );
+        const deletions = [
+          ...drawsSnap.docs.map(d => deleteDoc(doc(db,"draws",d.id))),
+          ...clientsSnap.docs.map(d => deleteDoc(doc(db,"clients",d.id))),
+          ...participantsSnaps.flatMap(s => s.docs.map(d => deleteDoc(doc(db,"participants",d.id))))
+        ];
+        await Promise.all(deletions);
         await deleteDoc(doc(db, "restaurants", id));
         toast(`"${data.name}" supprimé`);
         await loadList();
@@ -643,6 +669,94 @@ function renderList(filterText){
 
     listEl.appendChild(wrap);
   });
+}
+
+function openAccountModal(user){
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.innerHTML = `
+    <div class="card" style="max-width:380px;width:100%;">
+      <span class="stamp">Mon compte</span>
+      <h3 class="display" style="margin:12px 0 4px;">Réglages du compte</h3>
+      <p style="font-size:12px;color:var(--stone);margin:0 0 16px;font-family:'IBM Plex Mono',monospace;">${esc(user.email)}</p>
+
+      <label class="field">MOT DE PASSE ACTUEL (requis pour tout changement)</label>
+      <input type="text" id="a-current-pass" style="margin-bottom:18px;">
+
+      <div class="perf" style="margin:0 -24px 18px;"></div>
+
+      <label class="field">NOUVEAU PSEUDO (optionnel)</label>
+      <input type="text" id="a-pseudo" placeholder="pizzabella" style="margin-bottom:8px;">
+      <button class="btn btn-secondary a-save-pseudo" style="width:100%;margin-bottom:6px;">Changer le pseudo</button>
+      <p class="a-pseudo-status" style="font-size:12px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
+
+      <label class="field">NOUVEL EMAIL (optionnel)</label>
+      <input type="text" id="a-email" placeholder="nouveau@email.com" style="margin-bottom:8px;">
+      <button class="btn btn-secondary a-save-email" style="width:100%;margin-bottom:6px;">Changer l'email</button>
+      <p class="a-email-status" style="font-size:12px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
+
+      <label class="field">NOUVEAU MOT DE PASSE (optionnel, 6 car. min)</label>
+      <input type="text" id="a-newpass" style="margin-bottom:8px;">
+      <button class="btn btn-secondary a-save-pass" style="width:100%;margin-bottom:6px;">Changer le mot de passe</button>
+      <p class="a-pass-status" style="font-size:12px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
+
+      <button class="btn btn-primary a-close" style="width:100%;">Fermer</button>
+    </div>`;
+  document.body.appendChild(bg);
+  bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+  bg.querySelector(".a-close").onclick = () => bg.remove();
+
+  const currentPassEl = document.getElementById("a-current-pass");
+  currentPassEl.type = "password";
+
+  async function reauth(){
+    if (!currentPassEl.value) throw new Error("Renseigne ton mot de passe actuel ci-dessus.");
+    const cred = EmailAuthProvider.credential(user.email, currentPassEl.value);
+    await reauthenticateWithCredential(user, cred);
+  }
+
+  bg.querySelector(".a-save-pseudo").onclick = async () => {
+    const statusEl = bg.querySelector(".a-pseudo-status");
+    const newPseudo = document.getElementById("a-pseudo").value.trim().toLowerCase();
+    if (!newPseudo) { statusEl.textContent = "Tape un pseudo d'abord."; statusEl.style.color = "var(--stamp)"; return; }
+    statusEl.textContent = "…"; statusEl.style.color = "var(--stone)";
+    try {
+      await reauth();
+      await setDoc(doc(db,"usernames",newPseudo), { email: user.email.toLowerCase() });
+      statusEl.textContent = "Pseudo mis à jour ✅"; statusEl.style.color = "var(--stamp)";
+    } catch(e) {
+      statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
+    }
+  };
+
+  bg.querySelector(".a-save-email").onclick = async () => {
+    const statusEl = bg.querySelector(".a-email-status");
+    const newEmail = document.getElementById("a-email").value.trim().toLowerCase();
+    if (!newEmail || !newEmail.includes("@")) { statusEl.textContent = "Email invalide."; statusEl.style.color = "var(--stamp)"; return; }
+    statusEl.textContent = "…"; statusEl.style.color = "var(--stone)";
+    try {
+      await reauth();
+      await verifyBeforeUpdateEmail(user, newEmail);
+      statusEl.textContent = "Email de confirmation envoyé à " + newEmail + " — clique le lien reçu pour valider. Ton accès actuel reste actif en attendant.";
+      statusEl.style.color = "var(--gold)";
+    } catch(e) {
+      statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
+    }
+  };
+
+  bg.querySelector(".a-save-pass").onclick = async () => {
+    const statusEl = bg.querySelector(".a-pass-status");
+    const newPass = document.getElementById("a-newpass").value;
+    if (!newPass || newPass.length < 6) { statusEl.textContent = "6 caractères minimum."; statusEl.style.color = "var(--stamp)"; return; }
+    statusEl.textContent = "…"; statusEl.style.color = "var(--stone)";
+    try {
+      await reauth();
+      await updatePassword(user, newPass);
+      statusEl.textContent = "Mot de passe changé ✅"; statusEl.style.color = "var(--stamp)";
+    } catch(e) {
+      statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
+    }
+  };
 }
 
 function openAddModal(){
@@ -792,6 +906,7 @@ async function renderDetailInline(id, data, container){
     <div style="margin-top:16px;display:flex;justify-content:flex-end;">
       <button class="btn btn-primary draw-btn">🎁 Tirer un gagnant <span class="live-draw-count"></span></button>
     </div>
+    <p style="font-size:11px;color:var(--stone);margin:4px 0 0;font-family:'IBM Plex Mono',monospace;text-align:right;">Inscrits à CE tirage uniquement</p>
     <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">Clique sur "Tirer un gagnant" quand tu es prêt.</div>
 
     <div class="winner-msgs hidden" style="margin-top:16px;">
@@ -807,44 +922,76 @@ async function renderDetailInline(id, data, container){
       <button class="btn btn-primary send-lose-btn" style="width:100%;">📣 Envoyer aux autres</button>
       <p class="lose-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
     </div>
-    ` : `<p style="margin-top:14px;"><button class="btn btn-primary new-draw-btn2" style="width:100%;">🔄 Lancer un premier tirage</button></p>`}
+    ` : `<div style="margin-top:14px;text-align:center;padding:16px;background:var(--paper-deep);border-radius:6px;">
+        <p style="font-size:14px;color:var(--stone);margin:0 0 12px;font-family:'IBM Plex Mono',monospace;">Le QR code est prêt, mais rien à gagner tant qu'aucun tirage n'est lancé.</p>
+        <button class="btn btn-primary new-draw-btn2" style="width:100%;">🔄 Lancer un premier tirage</button>
+      </div>`}
 
     <div class="perf" style="margin:22px -20px;"></div>
 
-    <div>
-      <h4 class="display" style="margin:0 0 4px;font-size:16px;">🎁 Envoyer une promo</h4>
+    <details class="section" open>
+    <summary>🎁 Envoyer une promo</summary>
+    <div style="padding-top:10px;">
       <p class="promo-count" style="font-size:12px;color:var(--stone);margin:0 0 10px;font-family:'IBM Plex Mono',monospace;">Chargement…</p>
       <input type="text" class="promo-title" placeholder="Titre (ex: -20% ce week-end !)" style="margin-bottom:8px;">
       <textarea class="promo-message" placeholder="Message (ex: Reviens nous voir, offre valable jusqu'à dimanche)" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
       <button class="btn btn-primary send-promo-btn" style="width:100%;">Envoyer aux clients qui ont accepté les offres</button>
       <p class="promo-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
     </div>
+    </details>
 
     <div class="perf" style="margin:22px -20px;"></div>
 
-    <div>
-      <h4 class="display" style="margin:0 0 10px;font-size:16px;">Historique des tirages</h4>
+    <details class="section">
+    <summary>Historique des tirages ${closedDraws.length ? `(${closedDraws.length})` : ""}</summary>
+    <div style="padding-top:10px;">
       ${closedDraws.length === 0
         ? `<p style="font-size:13px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">Aucun tirage clôturé pour l'instant.</p>`
         : closedDraws.map(d => `
           <div class="history-row mono" style="font-size:12px;">
             <strong style="font-family:'Fraunces',serif;font-size:14px;">${esc(d.prize)}</strong>${d.date ? " · " + esc(d.date) : ""}<br>
-            <span style="color:var(--stone);">${d.participantCountAtClose ?? "?"} participant(s)</span>
+            <span style="color:var(--stone);">${d.participantCountAtClose ?? "?"} inscrit(s) à ce tirage</span>
             ${d.winner ? ` · Gagnant : <span style="color:var(--stamp);">${esc(d.winner.prenom)}</span>` : ""}
+            <br><a href="#" class="hist-view mono" data-draw-id="${d.id}" style="font-size:11px;text-decoration:underline;text-underline-offset:2px;">Voir les inscrits →</a>
+            <div class="hist-list-${d.id}" style="margin-top:8px;display:none;"></div>
           </div>`).join("")}
     </div>
+    </details>
 
     <div class="perf" style="margin:22px -20px;"></div>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <h4 class="display" style="margin:0;font-size:16px;">Clients <span class="live-client-count">(0)</span></h4>
-      <div style="display:flex;gap:8px;">
+    <details class="section">
+    <summary>Clients <span class="live-client-count">(0)</span></summary>
+    <div style="padding-top:10px;">
+      <p style="font-size:11px;color:var(--stone);margin:0 0 10px;font-family:'IBM Plex Mono',monospace;">Base permanente de ce commerçant, tous tirages confondus — différent du nombre d'inscrits à un tirage précis.</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
         <button class="btn btn-secondary copy-list-btn" style="font-size:12px;padding:8px 10px;">📋 Copier</button>
         <button class="btn btn-secondary csv-btn" style="font-size:12px;padding:8px 10px;">⬇️ CSV</button>
       </div>
+      <div class="clients-list">Chargement…</div>
     </div>
-    <div class="clients-list" style="margin-top:10px;">Chargement…</div>
+    </details>
   `;
+
+  container.querySelectorAll(".hist-view").forEach(link => {
+    link.onclick = async (e) => {
+      e.preventDefault();
+      const drawId = link.dataset.drawId;
+      const listEl = container.querySelector(`.hist-list-${drawId}`);
+      if (listEl.style.display !== "none") { listEl.style.display = "none"; return; }
+      listEl.style.display = "block";
+      listEl.innerHTML = `<p class="mono" style="font-size:11px;color:var(--stone);">Chargement…</p>`;
+      try {
+        const pSnap = await getDocs(query(collection(db,"participants"), where("drawId","==",drawId)));
+        const list = pSnap.docs.map(d => d.data());
+        listEl.innerHTML = list.length === 0
+          ? `<p class="mono" style="font-size:11px;color:var(--stone);">Personne n'était inscrit.</p>`
+          : list.map(p => `<div class="participant-row" style="font-size:12px;"><span>${esc(p.prenom)}</span><span style="color:var(--stone);">${esc(p.email)}</span></div>`).join("");
+      } catch(err) {
+        listEl.innerHTML = `<p class="err">Erreur : ${esc(err?.message || String(err))}</p>`;
+      }
+    };
+  });
 
   container.querySelector(".copy-link-btn").onclick = async () => {
     const btn = container.querySelector(".copy-link-btn");
