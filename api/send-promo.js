@@ -3,10 +3,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  const { external_ids, title, message } = req.body || {};
+  const { external_ids, title, message, resto_id, origin } = req.body || {};
   if (!Array.isArray(external_ids) || external_ids.length === 0 || !title || !message) {
     return res.status(400).json({ error: "external_ids (liste non vide), title et message sont requis" });
   }
+
+  const siteOrigin = origin || "https://tiketo.vercel.app";
+  const targetUrl = resto_id ? `${siteOrigin}/?resto=${resto_id}&promo=1` : siteOrigin;
 
   const REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
   const APP_ID = "ed8e48a0-0f7c-44fb-8630-0e0a84eb9545";
@@ -35,6 +38,9 @@ export default async function handler(req, res) {
           target_channel: "push",
           headings: { en: title, fr: title },
           contents: { en: message, fr: message },
+          url: targetUrl,
+          chrome_web_icon: `${siteOrigin}/logo.png`,
+          firefox_icon: `${siteOrigin}/logo.png`,
           // ciblage direct par identifiant externe (email) : pas besoin de
           // tags, donc aucun impact sur le quota de tags uniques du plan.
           include_aliases: { external_id: chunk },

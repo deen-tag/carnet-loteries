@@ -3,10 +3,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  const { resto_id, title, message } = req.body || {};
+  const { resto_id, title, message, origin } = req.body || {};
   if (!resto_id || !title || !message) {
     return res.status(400).json({ error: "resto_id, title et message sont requis" });
   }
+
+  const siteOrigin = origin || "https://tiketo.vercel.app";
+  const targetUrl = `${siteOrigin}/?resto=${resto_id}`;
 
   const REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
   const APP_ID = "ed8e48a0-0f7c-44fb-8630-0e0a84eb9545";
@@ -27,6 +30,9 @@ export default async function handler(req, res) {
         target_channel: "push",
         headings: { en: title, fr: title },
         contents: { en: message, fr: message },
+        url: targetUrl,
+        chrome_web_icon: `${siteOrigin}/logo.png`,
+        firefox_icon: `${siteOrigin}/logo.png`,
         filters: [
           { field: "tag", key: "resto_id", relation: "=", value: resto_id }
         ]
