@@ -120,16 +120,21 @@ const firebaseConfig = {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
+  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
   getFirestore, collection, addDoc, getDocs, getDoc, query, where,
   serverTimestamp, deleteDoc, doc, setDoc, updateDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const $app = document.getElementById("app");
 const params = new URLSearchParams(window.location.search);
 const restoId = params.get("resto");
+const SUPER_ADMIN_EMAIL = "deentag.pro@gmail.com";
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
 function clientDocId(rid, email){ return `${rid}_${email.trim().toLowerCase()}`; }
@@ -181,7 +186,73 @@ if (configMissing()) {
 } else if (restoId) {
   renderPublic(restoId);
 } else {
-  renderAdmin();
+  renderAdminGate();
+}
+
+// ================= PROTECTION ADMIN (Firebase Authentication) =================
+function renderAdminGate(){
+  onAuthStateChanged(auth, (user) => {
+    if (user) { renderAdmin(user); return; }
+    document.body.style.background = "var(--ink)";
+    $app.style.display="flex"; $app.style.alignItems="center"; $app.style.justifyContent="center"; $app.style.minHeight="100vh";
+    $app.innerHTML = `
+      <div style="width:100%;max-width:360px;" class="anim-rise">
+        <div class="card" style="border-radius:8px;text-align:center;">
+          <img src="logo.png" alt="Tiketo" style="height:34px;margin-bottom:18px;">
+          <h1 class="display" style="font-size:20px;margin:0 0 16px;">Accès admin</h1>
+          <input type="text" id="gate-email" placeholder="Email ou pseudo" style="margin-bottom:10px;" autocomplete="username">
+          <input type="text" id="gate-pass" placeholder="Mot de passe" style="margin-bottom:6px;" autocomplete="current-password">
+          <p style="text-align:right;margin:0 0 10px;"><a href="#" id="gate-forgot" style="font-size:12px;color:var(--stone);">Mot de passe oublié ?</a></p>
+          <p id="gate-err" class="err" style="margin-bottom:10px;"></p>
+          <button class="btn btn-primary" id="gate-submit" style="width:100%;">Se connecter</button>
+        </div>
+      </div>`;
+    const emailEl = document.getElementById("gate-email");
+    const passEl = document.getElementById("gate-pass");
+    passEl.type = "password";
+    emailEl.focus();
+    const errEl = document.getElementById("gate-err");
+
+    async function resolveLoginEmail(input){
+      const v = input.trim();
+      if (v.includes("@")) return v.toLowerCase();
+      // c'est un pseudo : on va chercher l'email réel associé
+      const uSnap = await getDoc(doc(db,"usernames",v.toLowerCase()));
+      if (!uSnap.exists()) throw new Error("Identifiant inconnu.");
+      return uSnap.data().email;
+    }
+
+    document.getElementById("gate-forgot").onclick = async (e) => {
+      e.preventDefault();
+      errEl.style.color = "";
+      if (!emailEl.value.trim()) { errEl.textContent = "Renseigne d'abord ton email ou pseudo ci-dessus."; return; }
+      try {
+        const realEmail = await resolveLoginEmail(emailEl.value);
+        await sendPasswordResetEmail(auth, realEmail);
+        errEl.style.color = "var(--gold)";
+        errEl.textContent = "Email envoyé — vérifie ta boîte de réception.";
+      } catch(e2) {
+        errEl.textContent = e2?.code === "auth/user-not-found" ? "Aucun compte avec cet email." : (e2?.message || "Erreur, réessaie.");
+      }
+    };
+    const submit = async () => {
+      const btn = document.getElementById("gate-submit");
+      errEl.textContent = ""; errEl.style.color = "";
+      btn.disabled = true; btn.textContent = "…";
+      try {
+        const realEmail = await resolveLoginEmail(emailEl.value);
+        await signInWithEmailAndPassword(auth, realEmail, passEl.value);
+        // onAuthStateChanged prendra le relais et affichera l'admin
+      } catch(e) {
+        const msg = e?.code === "auth/invalid-credential" ? "Email/pseudo ou mot de passe incorrect." : (e?.message || "Erreur de connexion.");
+        errEl.textContent = msg;
+        btn.disabled = false; btn.textContent = "Se connecter";
+      }
+    };
+    document.getElementById("gate-submit").onclick = submit;
+    passEl.onkeydown = (e) => { if (e.key === "Enter") submit(); };
+    emailEl.onkeydown = (e) => { if (e.key === "Enter") passEl.focus(); };
+  });
 }
 
 // ================= PAGE D'EXPLICATION ("C'est quoi Tiketo ?") =================
@@ -438,15 +509,27 @@ async function renderPublic(id){
 // ================= ADMIN DASHBOARD =================
 let allRestos = [];
 let allClientCounts = {};
+let currentUser = null;
+let currentIsSuperAdmin = false;
 
-async function renderAdmin(){
+async function renderAdmin(user){
+  document.body.style.background = "";
+  $app.style.display = ""; $app.style.alignItems = ""; $app.style.justifyContent = ""; $app.style.minHeight = "";
+  currentUser = user;
+  currentIsSuperAdmin = (user.email || "").toLowerCase() === SUPER_ADMIN_EMAIL;
+  const isSuperAdmin = currentIsSuperAdmin;
   $app.innerHTML = `
     <div class="anim-rise" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap;gap:12px;">
       <div>
         <img src="logo.png" alt="Tiketo" style="height:44px;margin-bottom:10px;">
-        <p style="color:var(--stone);font-size:13px;margin:0;font-family:'IBM Plex Mono',monospace;">Un QR code par commerçant, un seul site pour tous.</p>
+        <p style="color:var(--stone);font-size:13px;margin:0;font-family:'IBM Plex Mono',monospace;">
+          ${isSuperAdmin ? "Vue d'ensemble — tous les commerçants" : esc(user.email)}
+        </p>
       </div>
-      <button class="btn btn-primary" id="btn-add">+ Nouveau commerçant</button>
+      <div style="display:flex;gap:8px;align-items:flex-start;">
+        <button class="btn btn-secondary" id="btn-logout" style="font-size:12px;padding:8px 10px;">Déconnexion</button>
+        ${isSuperAdmin ? `<button class="btn btn-primary" id="btn-add">+ Nouveau commerçant</button>` : ""}
+      </div>
     </div>
     <div id="stats-bar" class="anim-rise" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;"></div>
     <div id="search-wrap" class="anim-rise hidden" style="margin-bottom:16px;">
@@ -455,11 +538,12 @@ async function renderAdmin(){
     <div id="list" class="grid"><p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;">Chargement…</p></div>
     <div id="detail"></div>
   `;
-  document.getElementById("btn-add").onclick = openAddModal;
+  const addBtn = document.getElementById("btn-add");
+  if (addBtn) addBtn.onclick = openAddModal;
+  document.getElementById("btn-logout").onclick = () => signOut(auth);
   document.getElementById("search-input").oninput = (e) => renderList(e.target.value);
-  await loadList();
+  await loadList(user, isSuperAdmin);
 }
-
 function statChip(label, value){
   return `<div class="card" style="padding:12px 18px;flex:1;min-width:120px;text-align:center;">
     <div class="ticket-no" style="font-size:26px;color:var(--stamp);">${value}</div>
@@ -467,17 +551,23 @@ function statChip(label, value){
   </div>`;
 }
 
-async function loadList(){
+async function loadList(user, isSuperAdmin){
+  user = user || currentUser;
+  isSuperAdmin = (isSuperAdmin !== undefined) ? isSuperAdmin : currentIsSuperAdmin;
   const [rSnap, cSnap] = await Promise.all([
     getDocs(collection(db,"restaurants")),
     getDocs(collection(db,"clients"))
   ]);
   allClientCounts = {};
   cSnap.forEach(d => { const rid = d.data().restaurantId; allClientCounts[rid] = (allClientCounts[rid]||0)+1; });
-  allRestos = rSnap.docs.map(d => ({ id: d.id, data: d.data() }));
+
+  const myEmail = (user.email || "").toLowerCase();
+  allRestos = rSnap.docs
+    .map(d => ({ id: d.id, data: d.data() }))
+    .filter(({data}) => isSuperAdmin || (data.ownerEmail || "").toLowerCase() === myEmail);
 
   document.getElementById("stats-bar").innerHTML =
-    statChip("Commerçants", allRestos.length) + statChip("Clients", cSnap.size);
+    statChip(isSuperAdmin ? "Commerçants" : "Ton commerce", allRestos.length) + statChip("Clients", allRestos.reduce((s,{id}) => s + (allClientCounts[id]||0), 0));
   document.getElementById("search-wrap").classList.toggle("hidden", allRestos.length < 5);
 
   renderList("");
@@ -564,10 +654,12 @@ function openAddModal(){
       <h3 class="display" style="margin:12px 0 16px;">Nouveau commerçant</h3>
       <label class="field">NOM DU COMMERCE</label>
       <input type="text" id="m-name" placeholder="Pizzeria Bella" style="margin-bottom:14px;">
-      <label class="field">LOT À GAGNER (1er tirage)</label>
-      <input type="text" id="m-prize" placeholder="Une pizza offerte" style="margin-bottom:14px;">
-      <label class="field">DATE DU TIRAGE (optionnel)</label>
-      <input type="text" id="m-date" placeholder="15 août 2026" style="margin-bottom:14px;">
+      <label class="field">EMAIL DU COMMERÇANT (son accès pour se connecter)</label>
+      <input type="text" id="m-owner-email" placeholder="proprietaire@commerce.com" style="margin-bottom:14px;">
+      <label class="field">MOT DE PASSE INITIAL (il pourra le changer)</label>
+      <input type="text" id="m-password" placeholder="6 caractères minimum" style="margin-bottom:14px;">
+      <label class="field">PSEUDO (optionnel, pour se connecter sans taper l'email)</label>
+      <input type="text" id="m-pseudo" placeholder="pizzabella" style="margin-bottom:14px;">
       <p id="m-err" class="err"></p>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-secondary" style="flex:1;" id="m-cancel">Annuler</button>
@@ -580,17 +672,22 @@ function openAddModal(){
   document.getElementById("m-cancel").onclick = () => bg.remove();
   document.getElementById("m-save").onclick = async () => {
     const name = document.getElementById("m-name").value.trim();
-    const prize = document.getElementById("m-prize").value.trim();
-    const date = document.getElementById("m-date").value.trim();
+    const ownerEmail = document.getElementById("m-owner-email").value.trim().toLowerCase();
+    const password = document.getElementById("m-password").value;
+    const pseudo = document.getElementById("m-pseudo").value.trim().toLowerCase();
     const errEl = document.getElementById("m-err");
-    if (!name || !prize){ errEl.textContent = "Le nom et le lot sont obligatoires."; return; }
+    if (!name || !ownerEmail || !password){ errEl.textContent = "Le nom, l'email et le mot de passe sont obligatoires."; return; }
     const btn = document.getElementById("m-save");
     btn.disabled = true; btn.textContent = "…";
     try{
-      const restoRef = await addDoc(collection(db,"restaurants"), { name, createdAt: serverTimestamp() });
-      await addDoc(collection(db,"draws"), {
-        restaurantId: restoRef.id, prize, date, status: "open", winner: null, createdAt: serverTimestamp()
+      const idToken = await currentUser.getIdToken();
+      const r = await fetch("/api/create-merchant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, name, ownerEmail, password, pseudo })
       });
+      const out = await r.json();
+      if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
       bg.remove();
       toast(`"${name}" créé — QR code prêt`);
       await loadList();
