@@ -46,6 +46,8 @@
 
   .stamp{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--stamp);color:var(--stamp);padding:3px 11px 3px 9px;border-radius:999px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;transform:rotate(-2deg);font-family:'IBM Plex Mono',monospace;font-weight:600;background:rgba(168,52,31,.06);}
   .stamp::before{content:"●";font-size:8px;}
+  .stamp-blue{border-color:var(--carbon);color:var(--carbon);background:rgba(46,74,99,.06);}
+  .stamp-gold{border-color:var(--gold);color:var(--gold);background:rgba(185,138,29,.08);}
 
   .card{background:var(--surface);border-radius:6px;padding:24px;box-shadow:0 1px 0 var(--line), 0 12px 24px -14px rgba(32,41,31,.35);position:relative;}
 
@@ -81,6 +83,7 @@
   .modal-bg{position:fixed;inset:0;background:rgba(32,41,31,.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;animation:fadeIn .18s ease;}
   .hidden{display:none !important;}
   .participant-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:9px 12px;background:#fff;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;flex-wrap:wrap;gap:6px;font-family:'IBM Plex Mono',monospace;animation:rise .25s ease both;}
+  .history-row{padding:12px 14px;background:#fff;border-radius:3px;border:1px solid var(--line);margin-bottom:8px;}
 
   .ticket-no{font-family:'Big Shoulders Stencil',sans-serif;font-weight:800;line-height:.85;color:var(--ink);}
 
@@ -117,7 +120,8 @@ const firebaseConfig = {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp, deleteDoc, doc, onSnapshot
+  getFirestore, collection, addDoc, getDocs, getDoc, query, where,
+  serverTimestamp, deleteDoc, doc, setDoc, updateDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -128,6 +132,7 @@ const params = new URLSearchParams(window.location.search);
 const restoId = params.get("resto");
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+function clientDocId(rid, email){ return `${rid}_${email.trim().toLowerCase()}`; }
 
 function toast(msg, ms=2200){
   const t = document.getElementById("toast");
@@ -209,24 +214,27 @@ function renderAbout(){
 async function renderPublic(id){
   document.body.style.background = "var(--ink)";
   $app.style.display="flex"; $app.style.alignItems="center"; $app.style.justifyContent="center"; $app.style.minHeight="100vh";
-
   $app.innerHTML = `<div class="mono" style="color:var(--paper);letter-spacing:.05em;">Chargement…</div>`;
 
-  const snap = await getDocs(query(collection(db,"restaurants")));
-  const r = snap.docs.find(d => d.id === id);
-
-  if (!r){
+  const rSnap = await getDoc(doc(db,"restaurants",id));
+  if (!rSnap.exists()){
     $app.innerHTML = `<div class="card anim-rise" style="text-align:center;max-width:340px;">
       <span class="stamp" style="margin-bottom:10px;">Introuvable</span>
       <p class="display" style="margin:8px 0 0;">Ce commerçant n'existe pas (ou plus). Vérifie le QR code.</p>
     </div>`;
     return;
   }
-  const data = r.data();
+  const data = rSnap.data();
   const ticketNo = String(id).slice(0,4).toUpperCase().replace(/[^A-Z0-9]/g,"0");
-  const isPromoClick = params.get("promo") === "1";
 
-  if (isPromoClick) {
+  const isPromoClick = params.get("promo") === "1";
+  const resultKind = params.get("result"); // "win" | "lose" | null
+
+  if (isPromoClick || resultKind) {
+    let heading, sub;
+    if (resultKind === "win") { heading = "🎉 Bravo !"; sub = `${data.name} va te contacter pour ton lot. Merci d'avoir participé !`; }
+    else if (resultKind === "lose") { heading = data.name; sub = `Tu n'as pas gagné cette fois, mais ${data.name} t'invite à retenter ta chance dans son établissement.`; }
+    else { heading = data.name; sub = "Merci d'être abonné(e) aux offres. À bientôt !"; }
     $app.innerHTML = `
       <div style="width:100%;max-width:400px;" class="anim-rise">
         <div class="card" style="border-radius:8px;padding:0;overflow:hidden;">
@@ -235,26 +243,46 @@ async function renderPublic(id){
             <span class="ticket-no" style="font-size:22px;color:var(--stamp);">N° ${esc(ticketNo)}</span>
           </div>
           <div style="padding:8px 24px 28px;text-align:center;">
-            <h1 class="display" style="font-size:26px;margin:20px 0 8px;">${esc(data.name)}</h1>
-            <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">Merci d'être abonné(e) aux offres. À bientôt !</p>
+            <h1 class="display" style="font-size:26px;margin:20px 0 8px;">${esc(heading)}</h1>
+            <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">${esc(sub)}</p>
           </div>
         </div>
       </div>`;
     return;
   }
 
+  // trouve le tirage actif de ce commerçant (2 filtres d'égalité, pas besoin
+  // d'index composite Firestore)
+  const drawsSnap = await getDocs(query(collection(db,"draws"), where("restaurantId","==",id)));
+  const openDraw = drawsSnap.docs.find(d => d.data().status === "open");
+
+  if (!openDraw){
+    $app.innerHTML = `
+      <div style="width:100%;max-width:400px;" class="anim-rise">
+        <div class="card" style="border-radius:8px;text-align:center;">
+          <img src="logo.png" alt="Tiketo" style="height:26px;margin-bottom:14px;">
+          <h1 class="display" style="font-size:24px;margin:6px 0 8px;">${esc(data.name)}</h1>
+          <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">Aucun tirage en cours pour le moment. Reviens bientôt !</p>
+        </div>
+      </div>`;
+    return;
+  }
+  const drawId = openDraw.id;
+  const draw = openDraw.data();
+  const ticketNo2 = String(drawId).slice(0,4).toUpperCase().replace(/[^A-Z0-9]/g,"0");
+
   $app.innerHTML = `
     <div style="width:100%;max-width:400px;" class="anim-rise">
       <div class="card" style="border-radius:8px;padding:0;overflow:hidden;">
         <div style="padding:20px 24px 4px;display:flex;justify-content:space-between;align-items:flex-start;">
           <img src="logo.png" alt="Tiketo" style="height:26px;">
-          <span class="ticket-no" style="font-size:22px;color:var(--stamp);">N° ${esc(ticketNo)}</span>
+          <span class="ticket-no" style="font-size:22px;color:var(--stamp);">N° ${esc(ticketNo2)}</span>
         </div>
         <div style="padding:8px 24px 0;">
           <h1 class="display" style="font-size:30px;margin:12px 0 4px;">${esc(data.name)}</h1>
           <p style="color:var(--stone);font-size:14px;margin:0 0 4px;font-family:'IBM Plex Mono',monospace;">
-            À gagner : <strong style="color:var(--stamp);">${esc(data.prize)}</strong>
-            ${data.date ? ` · Tirage le ${esc(data.date)}` : ""}
+            À gagner : <strong style="color:var(--stamp);">${esc(draw.prize)}</strong>
+            ${draw.date ? ` · Tirage le ${esc(draw.date)}` : ""}
           </p>
         </div>
 
@@ -289,12 +317,31 @@ async function renderPublic(id){
     if (!prenom) return errEl.textContent = "Ton prénom manque à l'appel.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return errEl.textContent = "Cette adresse email ne semble pas valide.";
 
+    const emailLower = email.toLowerCase();
     const btn = document.getElementById("f-submit");
     btn.disabled = true; btn.textContent = "Envoi…";
     try{
-      await addDoc(collection(db,"participants"), {
-        restaurantId: id, prenom, email, wantsResult: true, wantsPromo, ts: serverTimestamp()
-      });
+      // évite un doublon pour CE tirage précis (email = clé unique par round)
+      const dupSnap = await getDocs(query(
+        collection(db,"participants"),
+        where("drawId","==",drawId),
+        where("email","==",emailLower)
+      ));
+      if (dupSnap.empty) {
+        await addDoc(collection(db,"participants"), {
+          drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, ts: serverTimestamp()
+        });
+      }
+
+      // met à jour la base clients PERMANENTE de ce commerçant (indépendante
+      // des tirages, sert pour les promos)
+      const cRef = doc(db, "clients", clientDocId(id, emailLower));
+      const cSnap = await getDoc(cRef);
+      await setDoc(cRef, {
+        restaurantId: id, prenom, email: emailLower, wantsPromo,
+        lastSeen: serverTimestamp(),
+        ...(cSnap.exists() ? {} : { firstSeen: serverTimestamp() })
+      }, { merge: true });
 
       // ancre l'identité OneSignal dès que possible (dès qu'on connaît
       // l'email), pour laisser le temps au SDK de créer son "identity model"
@@ -307,15 +354,16 @@ async function renderPublic(id){
         earlyTries++;
       }
       if (OneSignalEarly) {
-        try { await OneSignalEarly.login(email.toLowerCase()); }
+        try { await OneSignalEarly.login(emailLower); }
         catch(e) { console.warn("[tiketo] login() anticipé a échoué (non bloquant):", e); }
       }
 
       const formWrap = document.getElementById("ticket-form");
+      const already = !dupSnap.empty;
       formWrap.innerHTML = `
         <div style="text-align:center;padding:6px 0 4px;">
           <div class="ticket-no" style="font-size:15px;color:var(--gold);animation:stampIn .5s ease;">✓ ENREGISTRÉ</div>
-          <p class="display" style="font-size:20px;margin:6px 0 4px;">Ticket confirmé !</p>
+          <p class="display" style="font-size:20px;margin:6px 0 4px;">${already ? "Tu participes déjà à ce tirage !" : "Ticket confirmé !"}</p>
           <p style="color:var(--stone);font-size:14px;margin-bottom:18px;font-family:'IBM Plex Mono',monospace;">Résultat annoncé par email si tu gagnes.</p>
           <button class="btn btn-primary" style="width:100%;" id="push-btn">🔔 Accepter les notifications pour recevoir la réponse plus vite</button>
         </div>`;
@@ -347,7 +395,6 @@ async function renderPublic(id){
             return;
           }
 
-          // attend que l'abonnement push soit vraiment créé côté OneSignal
           let subId = OneSignal.User.PushSubscription.id;
           let waitTries = 0;
           while (!subId && waitTries < 15) {
@@ -356,32 +403,22 @@ async function renderPublic(id){
             waitTries++;
           }
 
-          // ancre l'identité si le login anticipé n'a pas eu lieu (ex: était
-          // hors ligne juste après la validation du ticket) — sinon no-op.
-          const externalId = (email || `resto-${id}-${Date.now()}`).toLowerCase();
+          const externalId = emailLower;
           try { await OneSignal.login(externalId); } catch(e) { console.warn("[tiketo] login() de secours a échoué:", e); }
 
-          const tagPayload = {
-            resto_id: id
-          };
-
-          // tentative côté client (best-effort, peut échouer en silence)
+          // un seul tag, faible cardinalité — reste dans le quota gratuit
+          const tagPayload = { resto_id: id };
           try { await OneSignal.User.addTags(tagPayload); } catch(e) { console.warn("[tiketo] addTags client a échoué (non bloquant):", e); }
 
-          // pose fiable des tags DEPUIS LE SERVEUR via l'API REST OneSignal :
-          // le SDK client peut perdre l'envoi en silence, l'appel serveur non.
           const setTagsRes = await fetch("/api/set-tags", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ external_id: externalId, tags: tagPayload })
           });
           const setTagsData = await setTagsRes.json().catch(() => ({}));
-          if (!setTagsRes.ok) {
-            throw new Error(setTagsData?.error || "échec de la pose des tags côté serveur");
-          }
+          if (!setTagsRes.ok) throw new Error(setTagsData?.error || "échec de la pose des tags côté serveur");
 
           pushBtn.textContent = "🔔 Notifications activées, merci !";
-          console.log("[tiketo] push opt-in ok, subId=", subId, "externalId=", externalId, "tags envoyés=", tagPayload);
         } catch (e) {
           pushBtn.disabled = false;
           let msg = (e && e.message) ? e.message : "";
@@ -400,7 +437,7 @@ async function renderPublic(id){
 
 // ================= ADMIN DASHBOARD =================
 let allRestos = [];
-let allCounts = {};
+let allClientCounts = {};
 
 async function renderAdmin(){
   $app.innerHTML = `
@@ -431,16 +468,16 @@ function statChip(label, value){
 }
 
 async function loadList(){
-  const [rSnap, pSnap] = await Promise.all([
+  const [rSnap, cSnap] = await Promise.all([
     getDocs(collection(db,"restaurants")),
-    getDocs(collection(db,"participants"))
+    getDocs(collection(db,"clients"))
   ]);
-  allCounts = {};
-  pSnap.forEach(d => { const rid = d.data().restaurantId; allCounts[rid] = (allCounts[rid]||0)+1; });
+  allClientCounts = {};
+  cSnap.forEach(d => { const rid = d.data().restaurantId; allClientCounts[rid] = (allClientCounts[rid]||0)+1; });
   allRestos = rSnap.docs.map(d => ({ id: d.id, data: d.data() }));
 
   document.getElementById("stats-bar").innerHTML =
-    statChip("Commerçants", allRestos.length) + statChip("Participants", pSnap.size);
+    statChip("Commerçants", allRestos.length) + statChip("Clients", cSnap.size);
   document.getElementById("search-wrap").classList.toggle("hidden", allRestos.length < 5);
 
   renderList("");
@@ -475,9 +512,8 @@ function renderList(filterText){
         <div style="display:flex;align-items:center;gap:16px;min-width:0;">
           <div class="ticket-no" style="font-size:26px;color:var(--carbon);flex-shrink:0;">${esc(ticketNo)}</div>
           <div style="min-width:0;">
-            <span class="stamp">${allCounts[id]||0} particip.</span>
+            <span class="stamp">${allClientCounts[id]||0} client(s)</span>
             <h3 class="display" style="font-size:19px;margin:8px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(data.name)}</h3>
-            <p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">${esc(data.prize)}</p>
           </div>
         </div>
         <button class="btn btn-secondary del-btn" style="padding:8px 12px;flex-shrink:0;">🗑️</button>
@@ -495,7 +531,7 @@ function renderList(filterText){
         try { await renderDetailInline(id, data, body); }
         catch(e){ body.innerHTML = `<p class="err">Erreur : ${esc(e?.message || String(e))}</p>`; }
       } else {
-        if (body._unsub) { body._unsub(); body._unsub = null; }
+        if (body._unsub) { body._unsub.forEach(u => u()); body._unsub = null; }
         body.style.display = "none";
         body.innerHTML = "";
       }
@@ -528,7 +564,7 @@ function openAddModal(){
       <h3 class="display" style="margin:12px 0 16px;">Nouveau commerçant</h3>
       <label class="field">NOM DU COMMERCE</label>
       <input type="text" id="m-name" placeholder="Pizzeria Bella" style="margin-bottom:14px;">
-      <label class="field">LOT À GAGNER</label>
+      <label class="field">LOT À GAGNER (1er tirage)</label>
       <input type="text" id="m-prize" placeholder="Une pizza offerte" style="margin-bottom:14px;">
       <label class="field">DATE DU TIRAGE (optionnel)</label>
       <input type="text" id="m-date" placeholder="15 août 2026" style="margin-bottom:14px;">
@@ -551,7 +587,10 @@ function openAddModal(){
     const btn = document.getElementById("m-save");
     btn.disabled = true; btn.textContent = "…";
     try{
-      await addDoc(collection(db,"restaurants"), { name, prize, date, createdAt: serverTimestamp() });
+      const restoRef = await addDoc(collection(db,"restaurants"), { name, createdAt: serverTimestamp() });
+      await addDoc(collection(db,"draws"), {
+        restaurantId: restoRef.id, prize, date, status: "open", winner: null, createdAt: serverTimestamp()
+      });
       bg.remove();
       toast(`"${name}" créé — QR code prêt`);
       await loadList();
@@ -562,9 +601,66 @@ function openAddModal(){
   };
 }
 
+function openNewDrawModal(id, restoName, oldDrawId, onDone){
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.innerHTML = `
+    <div class="card" style="max-width:380px;width:100%;">
+      <span class="stamp">Nouveau round</span>
+      <h3 class="display" style="margin:12px 0 6px;">Nouveau tirage</h3>
+      <p style="font-size:13px;color:var(--stone);margin:0 0 16px;font-family:'IBM Plex Mono',monospace;">
+        L'ancien tirage sera clôturé et archivé. Les clients devront rescanner le QR pour participer à celui-ci.
+      </p>
+      <label class="field">LOT À GAGNER</label>
+      <input type="text" id="d-prize" placeholder="Un menu offert" style="margin-bottom:14px;">
+      <label class="field">DATE DU TIRAGE (optionnel)</label>
+      <input type="text" id="d-date" placeholder="15 août 2026" style="margin-bottom:14px;">
+      <p id="d-err" class="err"></p>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;" id="d-cancel">Annuler</button>
+        <button class="btn btn-primary" style="flex:1;" id="d-save">Lancer ce tirage</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  document.getElementById("d-prize").focus();
+  bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+  document.getElementById("d-cancel").onclick = () => bg.remove();
+  document.getElementById("d-save").onclick = async () => {
+    const prize = document.getElementById("d-prize").value.trim();
+    const date = document.getElementById("d-date").value.trim();
+    const errEl = document.getElementById("d-err");
+    if (!prize){ errEl.textContent = "Le lot est obligatoire."; return; }
+    const btn = document.getElementById("d-save");
+    btn.disabled = true; btn.textContent = "…";
+    try{
+      if (oldDrawId) {
+        const partSnap = await getDocs(query(collection(db,"participants"), where("drawId","==",oldDrawId)));
+        await updateDoc(doc(db,"draws",oldDrawId), {
+          status: "closed", closedAt: serverTimestamp(), participantCountAtClose: partSnap.size
+        });
+      }
+      await addDoc(collection(db,"draws"), {
+        restaurantId: id, prize, date, status: "open", winner: null, createdAt: serverTimestamp()
+      });
+      bg.remove();
+      toast("Nouveau tirage lancé");
+      onDone();
+    }catch(e){
+      errEl.textContent = "Erreur : " + (e?.message || String(e));
+      btn.disabled = false; btn.textContent = "Lancer ce tirage";
+    }
+  };
+}
+
 async function renderDetailInline(id, data, container){
   const publicUrl = `${window.location.origin}${window.location.pathname}?resto=${id}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=340x340&margin=10&color=20-29-31&data=${encodeURIComponent(publicUrl)}`;
+
+  const drawsSnap = await getDocs(query(collection(db,"draws"), where("restaurantId","==",id)));
+  const allDraws = drawsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const openDraw = allDraws.find(d => d.status === "open");
+  const closedDraws = allDraws.filter(d => d.status === "closed")
+    .sort((a,b) => (b.closedAt?.toMillis?.()||0) - (a.closedAt?.toMillis?.()||0));
 
   container.innerHTML = `
     <div class="perf" style="margin:0 -20px 18px;"></div>
@@ -579,15 +675,42 @@ async function renderDetailInline(id, data, container){
           <input type="text" readonly value="${publicUrl}" class="link-input mono" style="font-size:12px;width:100%;">
           <button class="btn btn-secondary copy-link-btn" style="flex-shrink:0;">Copier</button>
         </div>
-        <p style="font-size:12px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">Imprime le QR code et affiche-le en salle.</p>
+        <p style="font-size:12px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">Le lien/QR ne change jamais, même entre 2 tirages.</p>
       </div>
     </div>
 
-    <div style="margin-top:22px;display:flex;justify-content:space-between;align-items:center;">
-      <h4 class="display" style="margin:0;font-size:16px;">Tirage au sort</h4>
-      <button class="btn btn-primary draw-btn">🎁 Tirer un gagnant</button>
+    <div class="perf" style="margin:22px -20px;"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+      <div>
+        <h4 class="display" style="margin:0 0 4px;font-size:16px;">Tirage en cours</h4>
+        ${openDraw
+          ? `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">${esc(openDraw.prize)}${openDraw.date ? " · " + esc(openDraw.date) : ""}</p>`
+          : `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">Aucun tirage actif.</p>`}
+      </div>
+      <button class="btn btn-secondary new-draw-btn" style="font-size:12px;padding:8px 10px;">🔄 Nouveau tirage</button>
+    </div>
+
+    ${openDraw ? `
+    <div style="margin-top:16px;display:flex;justify-content:flex-end;">
+      <button class="btn btn-primary draw-btn">🎁 Tirer un gagnant <span class="live-draw-count"></span></button>
     </div>
     <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">Clique sur "Tirer un gagnant" quand tu es prêt.</div>
+
+    <div class="winner-msgs hidden" style="margin-top:16px;">
+      <label class="field">MESSAGE POUR LE GAGNANT</label>
+      <input type="text" class="win-title" placeholder="Titre" style="margin-bottom:8px;">
+      <textarea class="win-message" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
+      <button class="btn btn-primary send-win-btn" style="width:100%;margin-bottom:8px;">🏆 Envoyer au gagnant</button>
+      <p class="win-status" style="font-size:12px;color:var(--stone);margin:0 0 16px;font-family:'IBM Plex Mono',monospace;"></p>
+
+      <label class="field">MESSAGE POUR LES AUTRES PARTICIPANTS</label>
+      <input type="text" class="lose-title" placeholder="Titre" style="margin-bottom:8px;">
+      <textarea class="lose-message" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
+      <button class="btn btn-primary send-lose-btn" style="width:100%;">📣 Envoyer aux autres</button>
+      <p class="lose-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
+    </div>
+    ` : `<p style="margin-top:14px;"><button class="btn btn-primary new-draw-btn2" style="width:100%;">🔄 Lancer un premier tirage</button></p>`}
 
     <div class="perf" style="margin:22px -20px;"></div>
 
@@ -603,21 +726,27 @@ async function renderDetailInline(id, data, container){
     <div class="perf" style="margin:22px -20px;"></div>
 
     <div>
-      <h4 class="display" style="margin:0 0 10px;font-size:16px;">📣 Envoyer une notification</h4>
-      <input type="text" class="push-title" placeholder="Titre (ex: Résultat du tirage !)" style="margin-bottom:8px;">
-      <textarea class="push-message" placeholder="Message (ex: Le gagnant est... Merci à tous !)" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
-      <button class="btn btn-primary send-push-btn" style="width:100%;">Envoyer aux abonnés de ce commerçant</button>
-      <p class="push-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
+      <h4 class="display" style="margin:0 0 10px;font-size:16px;">Historique des tirages</h4>
+      ${closedDraws.length === 0
+        ? `<p style="font-size:13px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">Aucun tirage clôturé pour l'instant.</p>`
+        : closedDraws.map(d => `
+          <div class="history-row mono" style="font-size:12px;">
+            <strong style="font-family:'Fraunces',serif;font-size:14px;">${esc(d.prize)}</strong>${d.date ? " · " + esc(d.date) : ""}<br>
+            <span style="color:var(--stone);">${d.participantCountAtClose ?? "?"} participant(s)</span>
+            ${d.winner ? ` · Gagnant : <span style="color:var(--stamp);">${esc(d.winner.prenom)}</span>` : ""}
+          </div>`).join("")}
     </div>
 
-    <div style="margin-top:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <h4 class="display" style="margin:0;font-size:16px;">Participants <span class="live-count">(0)</span></h4>
+    <div class="perf" style="margin:22px -20px;"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <h4 class="display" style="margin:0;font-size:16px;">Clients <span class="live-client-count">(0)</span></h4>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-secondary copy-list-btn" style="font-size:12px;padding:8px 10px;">📋 Copier</button>
         <button class="btn btn-secondary csv-btn" style="font-size:12px;padding:8px 10px;">⬇️ CSV</button>
       </div>
     </div>
-    <div class="participants-list" style="margin-top:10px;">Chargement…</div>
+    <div class="clients-list" style="margin-top:10px;">Chargement…</div>
   `;
 
   container.querySelector(".copy-link-btn").onclick = async () => {
@@ -633,54 +762,63 @@ async function renderDetailInline(id, data, container){
     document.body.appendChild(a); a.click(); a.remove();
   };
 
-  let participants = [];
+  const reload = async () => {
+    if (container._unsub) { container._unsub.forEach(u => u()); container._unsub = null; }
+    container.innerHTML = `<p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Chargement…</p>`;
+    await renderDetailInline(id, data, container);
+    await loadList();
+  };
 
-  function renderParticipantsList(){
-    const listEl = container.querySelector(".participants-list");
-    container.querySelector(".live-count").textContent = `(${participants.length})`;
-    const promoCount = participants.filter(p => p.wantsPromo && p.email).length;
+  const newDrawBtn = container.querySelector(".new-draw-btn");
+  if (newDrawBtn) newDrawBtn.onclick = () => openNewDrawModal(id, data.name, openDraw?.id, reload);
+  const newDrawBtn2 = container.querySelector(".new-draw-btn2");
+  if (newDrawBtn2) newDrawBtn2.onclick = () => openNewDrawModal(id, data.name, null, reload);
+
+  // ---- clients (base permanente, sert aussi aux promos) ----
+  let clients = [];
+  function renderClientsList(){
+    const listEl = container.querySelector(".clients-list");
+    container.querySelector(".live-client-count").textContent = `(${clients.length})`;
+    const promoCount = clients.filter(c => c.wantsPromo && c.email).length;
     container.querySelector(".promo-count").textContent = `${promoCount} client(s) ont accepté de recevoir des offres.`;
-    if (participants.length === 0){
+    if (clients.length === 0){
       listEl.innerHTML = `<p style="font-size:13px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">Personne n'a encore scanné le QR code.</p>`;
     } else {
-      listEl.innerHTML = participants.map(p => `
+      listEl.innerHTML = clients.map(c => `
         <div class="participant-row">
-          <span style="font-weight:600;font-family:'Fraunces',serif;">${esc(p.prenom)}</span>
-          <span style="color:var(--stone);">${esc(p.email)}</span>
-          <span style="color:${p.wantsPromo ? "var(--gold)" : "var(--stone)"};">${p.wantsPromo ? "promo ok" : ""}</span>
+          <span style="font-weight:600;font-family:'Fraunces',serif;">${esc(c.prenom)}</span>
+          <span style="color:var(--stone);">${esc(c.email)}</span>
+          <span style="color:${c.wantsPromo ? "var(--gold)" : "var(--stone)"};">${c.wantsPromo ? "promo ok" : ""}</span>
         </div>`).join("");
     }
   }
-
-  const q = query(collection(db,"participants"), where("restaurantId","==",id));
-  const unsub = onSnapshot(q, (snap) => {
-    participants = snap.docs.map(d => d.data());
-    renderParticipantsList();
+  const clientsUnsub = onSnapshot(query(collection(db,"clients"), where("restaurantId","==",id)), (snap) => {
+    clients = snap.docs.map(d => d.data());
+    renderClientsList();
   }, (err) => {
-    container.querySelector(".participants-list").innerHTML = `<p class="err">Erreur temps réel : ${esc(err?.message || String(err))}</p>`;
+    container.querySelector(".clients-list").innerHTML = `<p class="err">Erreur temps réel : ${esc(err?.message || String(err))}</p>`;
   });
-  container._unsub = unsub;
 
   container.querySelector(".copy-list-btn").onclick = async () => {
     const btn = container.querySelector(".copy-list-btn");
-    if (participants.length === 0) { btn.textContent = "Vide"; setTimeout(()=>btn.textContent="📋 Copier",1200); return; }
-    const text = participants.map(p => `${p.prenom}\t${p.email}`).join("\n");
+    if (clients.length === 0) { btn.textContent = "Vide"; setTimeout(()=>btn.textContent="📋 Copier",1200); return; }
+    const text = clients.map(c => `${c.prenom}\t${c.email}`).join("\n");
     try{ await navigator.clipboard.writeText(text); btn.textContent = "Copié !"; toast("Liste copiée"); setTimeout(()=>btn.textContent="📋 Copier",1500); }
     catch{ btn.textContent = "Erreur copie"; }
   };
 
   container.querySelector(".csv-btn").onclick = () => {
-    if (participants.length === 0) return;
-    const header = "prenom,email,veut_resultat,veut_promo\n";
-    const rows = participants.map(p =>
-      [p.prenom, p.email, p.wantsResult ? "oui" : "non", p.wantsPromo ? "oui" : "non"]
+    if (clients.length === 0) return;
+    const header = "prenom,email,veut_promo\n";
+    const rows = clients.map(c =>
+      [c.prenom, c.email, c.wantsPromo ? "oui" : "non"]
         .map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `participants-${data.name.replace(/[^a-z0-9]+/gi,"-")}.csv`;
+    a.download = `clients-${data.name.replace(/[^a-z0-9]+/gi,"-")}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -695,9 +833,7 @@ async function renderDetailInline(id, data, container){
     const message = container.querySelector(".promo-message").value.trim();
     if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "promo-status err"; return; }
 
-    const targets = [...new Set(
-      participants.filter(p => p.wantsPromo && p.email).map(p => p.email.toLowerCase())
-    )];
+    const targets = [...new Set(clients.filter(c => c.wantsPromo && c.email).map(c => c.email.toLowerCase()))];
     if (targets.length === 0) { statusEl.textContent = "Personne n'a encore accepté de recevoir des offres."; statusEl.className = "promo-status err"; return; }
 
     btn.disabled = true; btn.textContent = "Envoi…";
@@ -713,25 +849,7 @@ async function renderDetailInline(id, data, container){
       statusEl.textContent = `Envoyée à ${targets.length} client(s) — vérification en cours…`;
       statusEl.style.color = "var(--stone)";
       toast("Promo envoyée");
-
-      if (out.notification_ids && out.notification_ids.length) {
-        setTimeout(async () => {
-          try {
-            let successful = 0;
-            for (const nid of out.notification_ids) {
-              const chk = await fetch("/api/check-notification", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ notification_id: nid })
-              });
-              const chkData = await chk.json();
-              if (chk.ok && typeof chkData.successful === "number") successful += chkData.successful;
-            }
-            statusEl.textContent = `Livrée à ${successful} client(s) sur ${targets.length} ciblé(s) ✅`;
-            statusEl.style.color = "var(--stamp)";
-          } catch(_) { /* on laisse le message provisoire si la vérif échoue */ }
-        }, 4000);
-      }
+      pollDelivery(out.notification_ids, targets.length, statusEl);
     } catch (e) {
       statusEl.textContent = "Erreur : " + (e?.message || String(e));
       statusEl.className = "promo-status err";
@@ -740,55 +858,43 @@ async function renderDetailInline(id, data, container){
     }
   };
 
-  container.querySelector(".send-push-btn").onclick = async () => {
-    const btn = container.querySelector(".send-push-btn");
-    const statusEl = container.querySelector(".push-status");
-    const title = container.querySelector(".push-title").value.trim();
-    const message = container.querySelector(".push-message").value.trim();
-    if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "push-status err"; return; }
-    btn.disabled = true; btn.textContent = "Envoi…";
-    statusEl.textContent = ""; statusEl.className = "push-status";
-    try {
-      const r = await fetch("/api/send-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resto_id: id, title, message, origin: window.location.origin })
-      });
-      const out = await r.json();
-      if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
-      statusEl.textContent = "Envoyée — vérification en cours…";
-      statusEl.style.color = "var(--stone)";
-      toast("Notification envoyée");
+  async function pollDelivery(ids, targeted, statusEl){
+    if (!ids || !ids.length) return;
+    setTimeout(async () => {
+      try {
+        let successful = 0;
+        for (const nid of ids) {
+          const chk = await fetch("/api/check-notification", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notification_id: nid })
+          });
+          const chkData = await chk.json();
+          if (chk.ok && typeof chkData.successful === "number") successful += chkData.successful;
+        }
+        statusEl.textContent = `Livrée à ${successful} sur ${targeted} ciblé(s) ✅`;
+        statusEl.style.color = "var(--stamp)";
+      } catch(_) { /* on laisse le message provisoire si la vérif échoue */ }
+    }, 4000);
+  }
 
-      if (out.id) {
-        setTimeout(async () => {
-          try {
-            const chk = await fetch("/api/check-notification", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ notification_id: out.id })
-            });
-            const chkData = await chk.json();
-            const successful = (chk.ok && typeof chkData.successful === "number") ? chkData.successful : out.recipients;
-            statusEl.textContent = `Livrée à ${successful} abonné(s) ✅`;
-            statusEl.style.color = "var(--stamp)";
-          } catch(_) { /* on laisse le message provisoire si la vérif échoue */ }
-        }, 4000);
-      }
-    } catch (e) {
-      statusEl.textContent = "Erreur : " + (e?.message || String(e));
-      statusEl.className = "push-status err";
-    } finally {
-      btn.disabled = false; btn.textContent = "Envoyer aux abonnés de ce commerçant";
-    }
-  };
+  if (!openDraw) return; // pas de tirage actif : rien de plus à câbler
+
+  // ---- participants du tirage en cours (pour tirage au sort) ----
+  let drawParticipants = [];
+  const drawUnsub = onSnapshot(query(collection(db,"participants"), where("drawId","==",openDraw.id)), (snap) => {
+    drawParticipants = snap.docs.map(d => d.data());
+    const el = container.querySelector(".live-draw-count");
+    if (el) el.textContent = `(${drawParticipants.length})`;
+  });
+
+  container._unsub = [clientsUnsub, drawUnsub];
 
   container.querySelector(".draw-btn").onclick = () => {
     const box = container.querySelector(".winner-box");
-    if (participants.length === 0){ box.textContent = "Aucun participant pour l'instant."; return; }
+    if (drawParticipants.length === 0){ box.textContent = "Aucun participant pour l'instant sur ce tirage."; return; }
     let i = 0;
     const spin = setInterval(() => {
-      const w = participants[Math.floor(Math.random()*participants.length)];
+      const w = drawParticipants[Math.floor(Math.random()*drawParticipants.length)];
       box.innerHTML = `<div style="text-align:center;padding:16px 0;background:var(--paper-deep);border-radius:6px;">
         <p class="mono" style="font-size:11px;color:var(--stone);margin:0;letter-spacing:.1em;">TIRAGE EN COURS...</p>
         <p class="display" style="font-size:24px;color:var(--carbon);margin:4px 0;">${esc(w.prenom)}</p>
@@ -803,12 +909,70 @@ async function renderDetailInline(id, data, container){
         </div>`;
         confettiBurst(box.querySelector(".winner-reveal"));
 
-        // pré-remplit le message de notif avec un texte prêt à l'emploi,
-        // modifiable avant l'envoi.
-        const titleEl = container.querySelector(".push-title");
-        const msgEl = container.querySelector(".push-message");
-        if (!titleEl.value.trim()) titleEl.value = `Résultat du tirage — ${data.name}`;
-        if (!msgEl.value.trim()) msgEl.value = `Félicitations ${w.prenom} ! Tu as gagné : ${data.prize}. Passe le récupérer chez ${data.name} 🎉`;
+        updateDoc(doc(db,"draws",openDraw.id), { winner: { prenom: w.prenom, email: w.email } }).catch(()=>{});
+
+        const msgsWrap = container.querySelector(".winner-msgs");
+        msgsWrap.classList.remove("hidden");
+        const winTitleEl = container.querySelector(".win-title");
+        const winMsgEl = container.querySelector(".win-message");
+        const loseTitleEl = container.querySelector(".lose-title");
+        const loseMsgEl = container.querySelector(".lose-message");
+        if (!winTitleEl.value.trim()) winTitleEl.value = `Tu as gagné ! — ${data.name}`;
+        if (!winMsgEl.value.trim()) winMsgEl.value = `🎉 Félicitations ${w.prenom} ! Tu as gagné : ${openDraw.prize}. Passe le récupérer chez ${data.name}.`;
+        if (!loseTitleEl.value.trim()) loseTitleEl.value = `Résultat du tirage — ${data.name}`;
+        if (!loseMsgEl.value.trim()) loseMsgEl.value = `Le gagnant est ${w.prenom}. Merci d'avoir participé, à bientôt pour le prochain tirage chez ${data.name} !`;
+
+        container.querySelector(".send-win-btn").onclick = async () => {
+          const btn = container.querySelector(".send-win-btn");
+          const statusEl = container.querySelector(".win-status");
+          const title = winTitleEl.value.trim(), message = winMsgEl.value.trim();
+          if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "win-status err"; return; }
+          btn.disabled = true; btn.textContent = "Envoi…";
+          statusEl.textContent = ""; statusEl.className = "win-status";
+          try {
+            const r = await fetch("/api/send-promo", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win" })
+            });
+            const out = await r.json();
+            if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
+            statusEl.textContent = "Envoyée au gagnant — vérification en cours…";
+            statusEl.style.color = "var(--stone)";
+            pollDelivery(out.notification_ids, 1, statusEl);
+          } catch(e) {
+            statusEl.textContent = "Erreur : " + (e?.message || String(e));
+            statusEl.className = "win-status err";
+          } finally {
+            btn.disabled = false; btn.textContent = "🏆 Envoyer au gagnant";
+          }
+        };
+
+        container.querySelector(".send-lose-btn").onclick = async () => {
+          const btn = container.querySelector(".send-lose-btn");
+          const statusEl = container.querySelector(".lose-status");
+          const title = loseTitleEl.value.trim(), message = loseMsgEl.value.trim();
+          if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "lose-status err"; return; }
+          const losers = [...new Set(drawParticipants.filter(p => p.email.toLowerCase() !== w.email.toLowerCase()).map(p => p.email.toLowerCase()))];
+          if (losers.length === 0) { statusEl.textContent = "Aucun autre participant à prévenir."; statusEl.className = "lose-status err"; return; }
+          btn.disabled = true; btn.textContent = "Envoi…";
+          statusEl.textContent = ""; statusEl.className = "lose-status";
+          try {
+            const r = await fetch("/api/send-promo", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ external_ids: losers, title, message, resto_id: id, origin: window.location.origin, result: "lose" })
+            });
+            const out = await r.json();
+            if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
+            statusEl.textContent = `Envoyée à ${losers.length} participant(s) — vérification en cours…`;
+            statusEl.style.color = "var(--stone)";
+            pollDelivery(out.notification_ids, losers.length, statusEl);
+          } catch(e) {
+            statusEl.textContent = "Erreur : " + (e?.message || String(e));
+            statusEl.className = "lose-status err";
+          } finally {
+            btn.disabled = false; btn.textContent = "📣 Envoyer aux autres";
+          }
+        };
       }
     }, 90);
   };
