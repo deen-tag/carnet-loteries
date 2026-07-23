@@ -85,17 +85,6 @@
   .participant-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:9px 12px;background:#fff;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;flex-wrap:wrap;gap:6px;font-family:'IBM Plex Mono',monospace;animation:rise .25s ease both;}
   .history-row{padding:12px 14px;background:#fff;border-radius:3px;border:1px solid var(--line);margin-bottom:8px;}
 
-  .winner-carousel{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 6px 14px 2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-  .winner-carousel::-webkit-scrollbar{display:none;}
-  .winner-ticket{position:relative;flex:0 0 190px;scroll-snap-align:start;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px 15px;box-shadow:0 1px 0 var(--line), 0 10px 20px -14px rgba(32,41,31,.35);animation:rise .3s ease both;}
-  .winner-ticket::before,.winner-ticket::after{content:"";position:absolute;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;background:var(--paper-deep);}
-  .winner-ticket::before{left:-7px;}
-  .winner-ticket::after{right:-7px;}
-  .winner-ticket .w-resto{font-family:'Fraunces',serif;font-weight:700;font-size:15px;margin:8px 0 5px;color:var(--ink);line-height:1.25;}
-  .winner-ticket .w-line{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink);margin-bottom:4px;line-height:1.4;}
-  .winner-ticket .w-line strong{color:var(--stamp);font-weight:600;}
-  .winner-ticket .w-date{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--stone);letter-spacing:.02em;}
-
   details.section > summary{cursor:pointer;list-style:none;font-family:'Fraunces',serif;font-size:16px;font-weight:600;display:flex;justify-content:space-between;align-items:center;padding:4px 0;}
   details.section > summary::-webkit-details-marker{display:none;}
   details.section > summary::after{content:"▾";font-family:'IBM Plex Mono',monospace;color:var(--stone);font-size:13px;transition:transform .15s ease;}
@@ -241,7 +230,7 @@ function renderAdminGate(){
     $app.innerHTML = `
       <div style="width:100%;max-width:360px;" class="anim-rise">
         <div class="card" style="border-radius:8px;text-align:center;">
-          <img src="logo.png" alt="Tiketo" style="height:34px;margin-bottom:18px;">
+          <img src="logo.png" alt="Tiketo" style="height:85px;margin-bottom:18px;">
           <h1 class="display" style="font-size:20px;margin:0 0 16px;">Espace pro</h1>
           <input type="text" id="gate-email" placeholder="Email ou pseudo" style="margin-bottom:10px;" autocomplete="username">
           <input type="text" id="gate-pass" placeholder="Mot de passe" style="margin-bottom:6px;" autocomplete="current-password">
@@ -305,7 +294,7 @@ function renderAbout(){
   $app.innerHTML = `
     <div style="width:100%;max-width:420px;" class="anim-rise">
       <div class="card" style="border-radius:8px;">
-        <img src="logo.png" alt="Tiketo" style="height:30px;margin-bottom:18px;">
+        <img src="logo.png" alt="Tiketo" style="height:75px;margin-bottom:18px;">
         <h1 class="display" style="font-size:24px;margin:0 0 14px;">C'est quoi Tiketo ?</h1>
         <p style="font-size:14px;line-height:1.7;color:var(--ink);margin:0 0 12px;">
           Tiketo est un simple outil utilisé par des commerces locaux (restaurants, cafés, boutiques...)
@@ -353,11 +342,12 @@ async function fetchRecentWinners(limitN){
 }
 
 function winnerRowHtml(w){
-  return `<div class="winner-ticket">
-    <span class="stamp stamp-gold" style="font-size:9px;padding:2px 9px 2px 7px;">🎟 gagnant</span>
-    <div class="w-resto">${esc(w.resto)}</div>
-    <div class="w-line">${esc(w.prenom)} a gagné · <strong>${esc(w.prize)}</strong></div>
-    <div class="w-date">${esc(w.date)}</div>
+  return `<div class="participant-row" style="align-items:flex-start;">
+    <div>
+      <div style="font-weight:600;font-family:'Fraunces',serif;font-size:14px;">${esc(w.prenom)}</div>
+      <div style="color:var(--stone);font-size:11px;">${esc(w.resto)} · ${esc(w.date)}</div>
+    </div>
+    <div style="color:var(--stamp);font-size:11px;text-align:right;max-width:40%;">${esc(w.prize)}</div>
   </div>`;
 }
 
@@ -366,7 +356,7 @@ async function renderHome(){
   $app.style.display = ""; $app.style.alignItems = ""; $app.style.justifyContent = ""; $app.style.minHeight = "";
   $app.innerHTML = `
     <div class="anim-rise" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;">
-      <img src="logo.png" alt="Tiketo" style="height:26px;">
+      <img src="logo.png" alt="Tiketo" style="height:65px;">
       <a href="?admin=1" class="btn btn-secondary" style="font-size:12px;padding:8px 14px;text-decoration:none;">Se connecter</a>
     </div>
 
@@ -389,6 +379,11 @@ async function renderHome(){
         <h3 class="display" style="font-size:19px;margin:0 0 10px;">Tu as un commerce ?</h3>
         <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 16px;">Affiche un QR code, tes clients tentent de gagner un lot de ton choix en un instant — et toi, tu construis discrètement ta base de clients. Tu tires le gagnant en un clic, et surtout : tu peux ensuite relancer tous tes clients quand tu veux, par notification push, pour annoncer une promo, un événement ou un nouveau tirage. Zéro app à installer, pour toi comme pour eux.</p>
         <a href="?admin=1" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Accéder à mon espace →</a>
+
+        <div style="margin-top:20px;border:1px solid var(--line);border-radius:6px;overflow:hidden;">
+          <img src="panneau.png" alt="Exemple de panneau Tiketo à poser en boutique" style="width:100%;display:block;">
+        </div>
+        <p class="mono" style="font-size:11px;color:var(--stone);margin:10px 0 0;line-height:1.6;">Un panneau prêt à poser sur ton comptoir — tes clients scannent ou approchent leur téléphone, sans rien installer.</p>
       </div>
       <div class="perf" style="margin:0 -20px;"></div>
       <div style="padding:22px 20px;">
@@ -416,7 +411,7 @@ async function renderHome(){
   const rows = await fetchRecentWinners(6);
   winnersEl.innerHTML = rows.length === 0
     ? `<p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Aucun tirage clôturé pour l'instant — reviens bientôt !</p>`
-    : `<div class="winner-carousel">${rows.map(winnerRowHtml).join("")}</div>`;
+    : rows.map(winnerRowHtml).join("");
 }
 
 // ================= RECHERCHE DE GAGNANTS PAR COMMERCE =================
@@ -521,7 +516,7 @@ async function renderPublic(id){
       <div style="width:100%;max-width:400px;" class="anim-rise">
         <div class="card" style="border-radius:8px;padding:0;overflow:hidden;">
           <div style="padding:20px 24px 4px;display:flex;justify-content:space-between;align-items:flex-start;">
-            <img src="logo.png" alt="Tiketo" style="height:26px;">
+            <img src="logo.png" alt="Tiketo" style="height:65px;">
             <span class="ticket-no" style="font-size:22px;color:var(--stamp);">N° ${esc(ticketNo)}</span>
           </div>
           <div style="padding:8px 24px 28px;text-align:center;">
@@ -556,7 +551,7 @@ async function renderPublic(id){
     $app.innerHTML = `
       <div style="width:100%;max-width:400px;" class="anim-rise">
         <div class="card" style="border-radius:8px;text-align:center;">
-          <img src="logo.png" alt="Tiketo" style="height:26px;margin-bottom:14px;">
+          <img src="logo.png" alt="Tiketo" style="height:65px;margin-bottom:14px;">
           <h1 class="display" style="font-size:24px;margin:6px 0 8px;">${esc(data.name)}</h1>
           <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">Aucun tirage en cours pour le moment. Reviens bientôt !</p>
         </div>
@@ -571,7 +566,7 @@ async function renderPublic(id){
     <div style="width:100%;max-width:400px;" class="anim-rise">
       <div class="card" style="border-radius:8px;padding:0;overflow:hidden;">
         <div style="padding:20px 24px 4px;display:flex;justify-content:space-between;align-items:flex-start;">
-          <img src="logo.png" alt="Tiketo" style="height:26px;">
+          <img src="logo.png" alt="Tiketo" style="height:65px;">
           <span class="ticket-no" style="font-size:22px;color:var(--stamp);">N° ${esc(ticketNo2)}</span>
         </div>
         <div style="padding:8px 24px 0;">
@@ -755,7 +750,7 @@ async function renderAdmin(user){
   $app.innerHTML = `
     <div class="anim-rise" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap;gap:12px;">
       <div>
-        <img src="logo.png" alt="Tiketo" style="height:44px;margin-bottom:10px;">
+        <img src="logo.png" alt="Tiketo" style="height:110px;margin-bottom:10px;">
         <p style="color:var(--stone);font-size:13px;margin:0;font-family:'IBM Plex Mono',monospace;">
           ${isSuperAdmin ? "Vue d'ensemble — tous les commerces" : esc(user.email)}
         </p>
