@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  const { idToken, external_ids, title, message, resto_id, origin, result } = req.body || {};
+  const { idToken, external_ids, title, message, resto_id, origin, result, drawId, code } = req.body || {};
   if (!idToken || !resto_id) {
     return res.status(400).json({ error: "idToken et resto_id sont requis" });
   }
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
   const siteOrigin = origin || "https://tiketo.vercel.app";
   let targetUrl = siteOrigin;
   if (resto_id) {
-    if (result === "win") targetUrl = `${siteOrigin}/?resto=${resto_id}&result=win`;
+    if (result === "win") targetUrl = `${siteOrigin}/?resto=${resto_id}&result=win${drawId && code ? `&draw=${encodeURIComponent(drawId)}&code=${encodeURIComponent(code)}` : ""}`;
     else if (result === "lose") targetUrl = `${siteOrigin}/?resto=${resto_id}&result=lose`;
     else targetUrl = `${siteOrigin}/?resto=${resto_id}&promo=1`;
   }
