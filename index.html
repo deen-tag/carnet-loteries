@@ -320,7 +320,7 @@ async function fetchRecentWinners(limitN){
   const drawsSnap = await getDocs(query(collection(db,"draws"), where("status","==","closed")));
   const rows = drawsSnap.docs
     .map(d => d.data())
-    .filter(d => d.winner && d.winner.publicOptIn && d.closedAt)
+    .filter(d => d.winner && d.closedAt)
     .sort((a,b) => (b.closedAt?.toMillis?.()||0) - (a.closedAt?.toMillis?.()||0))
     .slice(0, limitN);
 
@@ -449,7 +449,7 @@ async function renderWinnersSearch(){
         ? `<p style="font-size:13px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">Aucun tirage clôturé pour l'instant chez ce commerce.</p>`
         : rows.map(r => {
             const date = r.closedAt?.toDate ? r.closedAt.toDate().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}) : (r.date || "");
-            const name = (r.winner && r.winner.publicOptIn) ? esc(r.winner.prenom) : "Gagnant anonyme";
+            const name = r.winner ? esc(r.winner.prenom) : "Gagnant";
             return `<div class="participant-row" style="align-items:flex-start;">
               <div>
                 <div style="font-weight:600;font-family:'Fraunces',serif;font-size:14px;">${name}</div>
@@ -498,7 +498,7 @@ async function renderPublic(id){
   if (isPromoClick || resultKind) {
     let heading, sub;
     if (resultKind === "win") { heading = "🎉 Bravo !"; sub = `${data.name} va te contacter pour ton lot. Merci d'avoir participé !`; }
-    else if (resultKind === "lose") { heading = data.name; sub = `Tu n'as pas gagné cette fois, mais ${data.name} t'invite à retenter ta chance dans son établissement.`; }
+    else if (resultKind === "lose") { heading = "Merci d'avoir participé !"; sub = `Le sort a désigné quelqu'un d'autre cette fois-ci. ${data.name} t'invite à retenter ta chance au prochain tirage — à bientôt !`; }
     else { heading = data.name; sub = "Merci d'être abonné(e) aux offres. À bientôt !"; }
     const unsubBlock = isPromoClick ? `
       <div id="unsub-wrap" style="margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);">
@@ -580,11 +580,8 @@ async function renderPublic(id){
             <input type="text" id="f-prenom" placeholder="Ton prénom" style="margin-bottom:16px;">
             <label class="field">EMAIL</label>
             <input type="email" id="f-email" placeholder="ton@email.com" style="margin-bottom:16px;">
-            <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:12px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">
-              <input type="checkbox" id="f-promo"> J'accepte de recevoir des offres de ${esc(data.name)} (facultatif)
-            </label>
             <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:18px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">
-              <input type="checkbox" id="f-public"> J'accepte d'apparaître (prénom uniquement) dans la liste publique des gagnants si je gagne (facultatif)
+              <input type="checkbox" id="f-promo"> J'accepte de recevoir des offres de ${esc(data.name)} (facultatif)
             </label>
             <p id="f-err" class="err"></p>
             <button class="btn btn-primary" style="width:100%;" id="f-submit">Valider mon ticket</button>
@@ -600,7 +597,6 @@ async function renderPublic(id){
     const prenom = document.getElementById("f-prenom").value.trim();
     const email = document.getElementById("f-email").value.trim();
     const wantsPromo = document.getElementById("f-promo").checked;
-    const publicOptIn = document.getElementById("f-public").checked;
     const errEl = document.getElementById("f-err");
     errEl.textContent = "";
 
@@ -626,7 +622,7 @@ async function renderPublic(id){
           // même temps, Firestore refuse la seconde écriture (règle "update: false"
           // sur un doc déjà existant) au lieu de créer un doublon.
           await setDoc(doc(db, "participants", `${drawId}_${emailLower}`), {
-            drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, publicOptIn, ts: serverTimestamp()
+            drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, ts: serverTimestamp()
           });
         } catch (e) {
           already = true;
@@ -1384,7 +1380,7 @@ async function renderDetailInline(id, data, container){
         </div>`;
         confettiBurst(box.querySelector(".winner-reveal"));
 
-        updateDoc(doc(db,"draws",openDraw.id), { winner: { prenom: w.prenom, email: w.email, publicOptIn: !!w.publicOptIn } }).catch(()=>{});
+        updateDoc(doc(db,"draws",openDraw.id), { winner: { prenom: w.prenom, email: w.email } }).catch(()=>{});
 
         const msgsWrap = container.querySelector(".winner-msgs");
         msgsWrap.classList.remove("hidden");
