@@ -1133,9 +1133,17 @@ async function renderDetailInline(id, data, container){
       <button class="btn btn-primary draw-btn">🎁 Tirer un gagnant <span class="live-draw-count"></span></button>
     </div>
     <p style="font-size:11px;color:var(--stone);margin:4px 0 0;font-family:'IBM Plex Mono',monospace;text-align:right;">Inscrits à CE tirage uniquement</p>
-    <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">Clique sur "Tirer un gagnant" quand tu es prêt.</div>
+    <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">
+      ${openDraw.winner
+        ? `<div class="winner-reveal" style="text-align:center;padding:18px 0;background:var(--paper-deep);border-radius:6px;">
+             <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">🎉 GAGNANT 🎉</p>
+             <p class="display" style="font-size:28px;color:var(--stamp);margin:6px 0;">${esc(openDraw.winner.prenom)}</p>
+             <p class="mono" style="font-size:13px;color:var(--stone);margin:0;">${esc(openDraw.winner.email)}</p>
+           </div>`
+        : `Clique sur "Tirer un gagnant" quand tu es prêt.`}
+    </div>
 
-    <div class="winner-msgs hidden" style="margin-top:16px;">
+    <div class="winner-msgs ${openDraw.winner ? "" : "hidden"}" style="margin-top:16px;">
       <label class="field">MESSAGE POUR LE GAGNANT</label>
       <input type="text" class="win-title" placeholder="Titre" style="margin-bottom:8px;">
       <textarea class="win-message" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
@@ -1360,6 +1368,77 @@ async function renderDetailInline(id, data, container){
 
   container._unsub = [clientsUnsub, drawUnsub];
 
+  function wireWinnerUI(w){
+    const msgsWrap = container.querySelector(".winner-msgs");
+    msgsWrap.classList.remove("hidden");
+    const winTitleEl = container.querySelector(".win-title");
+    const winMsgEl = container.querySelector(".win-message");
+    const loseTitleEl = container.querySelector(".lose-title");
+    const loseMsgEl = container.querySelector(".lose-message");
+    if (!winTitleEl.value.trim()) winTitleEl.value = `Tu as gagné ! — ${data.name}`;
+    if (!winMsgEl.value.trim()) winMsgEl.value = `🎉 Félicitations ${w.prenom} ! Tu as gagné : ${openDraw.prize}. Passe le récupérer chez ${data.name}.`;
+    if (!loseTitleEl.value.trim()) loseTitleEl.value = `Résultat du tirage — ${data.name}`;
+    if (!loseMsgEl.value.trim()) loseMsgEl.value = `Le gagnant est ${w.prenom}. Merci d'avoir participé, à bientôt pour le prochain tirage chez ${data.name} !`;
+
+    container.querySelector(".send-win-btn").onclick = async () => {
+      const btn = container.querySelector(".send-win-btn");
+      const statusEl = container.querySelector(".win-status");
+      const title = winTitleEl.value.trim(), message = winMsgEl.value.trim();
+      if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "win-status err"; return; }
+      btn.disabled = true; btn.textContent = "Envoi…";
+      statusEl.textContent = ""; statusEl.className = "win-status";
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        const r = await fetch("/api/send-promo", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken, external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win" })
+        });
+        const out = await r.json();
+        if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
+        statusEl.textContent = "Envoyée au gagnant — vérification en cours…";
+        statusEl.style.color = "var(--stone)";
+        pollDelivery(out.notification_ids, 1, statusEl);
+      } catch(e) {
+        statusEl.textContent = "Erreur : " + (e?.message || String(e));
+        statusEl.className = "win-status err";
+      } finally {
+        btn.disabled = false; btn.textContent = "🏆 Envoyer au gagnant";
+      }
+    };
+
+    container.querySelector(".send-lose-btn").onclick = async () => {
+      const btn = container.querySelector(".send-lose-btn");
+      const statusEl = container.querySelector(".lose-status");
+      const title = loseTitleEl.value.trim(), message = loseMsgEl.value.trim();
+      if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "lose-status err"; return; }
+      const losers = [...new Set(drawParticipants.filter(p => p.email.toLowerCase() !== w.email.toLowerCase()).map(p => p.email.toLowerCase()))];
+      if (losers.length === 0) { statusEl.textContent = "Aucun autre participant à prévenir."; statusEl.className = "lose-status err"; return; }
+      btn.disabled = true; btn.textContent = "Envoi…";
+      statusEl.textContent = ""; statusEl.className = "lose-status";
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        const r = await fetch("/api/send-promo", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken, external_ids: losers, title, message, resto_id: id, origin: window.location.origin, result: "lose" })
+        });
+        const out = await r.json();
+        if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
+        statusEl.textContent = `Envoyée à ${losers.length} participant(s) — vérification en cours…`;
+        statusEl.style.color = "var(--stone)";
+        pollDelivery(out.notification_ids, losers.length, statusEl);
+      } catch(e) {
+        statusEl.textContent = "Erreur : " + (e?.message || String(e));
+        statusEl.className = "lose-status err";
+      } finally {
+        btn.disabled = false; btn.textContent = "📣 Envoyer aux autres";
+      }
+    };
+  }
+
+  // le gagnant avait déjà été tiré avant un précédent rechargement de page :
+  // on restaure les boutons d'envoi tout de suite, sans attendre un nouveau clic
+  if (openDraw.winner) wireWinnerUI(openDraw.winner);
+
   container.querySelector(".draw-btn").onclick = () => {
     const box = container.querySelector(".winner-box");
     if (drawParticipants.length === 0){ box.textContent = "Aucun participant pour l'instant sur ce tirage."; return; }
@@ -1381,71 +1460,8 @@ async function renderDetailInline(id, data, container){
         confettiBurst(box.querySelector(".winner-reveal"));
 
         updateDoc(doc(db,"draws",openDraw.id), { winner: { prenom: w.prenom, email: w.email } }).catch(()=>{});
-
-        const msgsWrap = container.querySelector(".winner-msgs");
-        msgsWrap.classList.remove("hidden");
-        const winTitleEl = container.querySelector(".win-title");
-        const winMsgEl = container.querySelector(".win-message");
-        const loseTitleEl = container.querySelector(".lose-title");
-        const loseMsgEl = container.querySelector(".lose-message");
-        if (!winTitleEl.value.trim()) winTitleEl.value = `Tu as gagné ! — ${data.name}`;
-        if (!winMsgEl.value.trim()) winMsgEl.value = `🎉 Félicitations ${w.prenom} ! Tu as gagné : ${openDraw.prize}. Passe le récupérer chez ${data.name}.`;
-        if (!loseTitleEl.value.trim()) loseTitleEl.value = `Résultat du tirage — ${data.name}`;
-        if (!loseMsgEl.value.trim()) loseMsgEl.value = `Le gagnant est ${w.prenom}. Merci d'avoir participé, à bientôt pour le prochain tirage chez ${data.name} !`;
-
-        container.querySelector(".send-win-btn").onclick = async () => {
-          const btn = container.querySelector(".send-win-btn");
-          const statusEl = container.querySelector(".win-status");
-          const title = winTitleEl.value.trim(), message = winMsgEl.value.trim();
-          if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "win-status err"; return; }
-          btn.disabled = true; btn.textContent = "Envoi…";
-          statusEl.textContent = ""; statusEl.className = "win-status";
-          try {
-            const idToken = await auth.currentUser.getIdToken();
-            const r = await fetch("/api/send-promo", {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ idToken, external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win" })
-            });
-            const out = await r.json();
-            if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
-            statusEl.textContent = "Envoyée au gagnant — vérification en cours…";
-            statusEl.style.color = "var(--stone)";
-            pollDelivery(out.notification_ids, 1, statusEl);
-          } catch(e) {
-            statusEl.textContent = "Erreur : " + (e?.message || String(e));
-            statusEl.className = "win-status err";
-          } finally {
-            btn.disabled = false; btn.textContent = "🏆 Envoyer au gagnant";
-          }
-        };
-
-        container.querySelector(".send-lose-btn").onclick = async () => {
-          const btn = container.querySelector(".send-lose-btn");
-          const statusEl = container.querySelector(".lose-status");
-          const title = loseTitleEl.value.trim(), message = loseMsgEl.value.trim();
-          if (!title || !message) { statusEl.textContent = "Remplis le titre et le message."; statusEl.className = "lose-status err"; return; }
-          const losers = [...new Set(drawParticipants.filter(p => p.email.toLowerCase() !== w.email.toLowerCase()).map(p => p.email.toLowerCase()))];
-          if (losers.length === 0) { statusEl.textContent = "Aucun autre participant à prévenir."; statusEl.className = "lose-status err"; return; }
-          btn.disabled = true; btn.textContent = "Envoi…";
-          statusEl.textContent = ""; statusEl.className = "lose-status";
-          try {
-            const idToken = await auth.currentUser.getIdToken();
-            const r = await fetch("/api/send-promo", {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ idToken, external_ids: losers, title, message, resto_id: id, origin: window.location.origin, result: "lose" })
-            });
-            const out = await r.json();
-            if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
-            statusEl.textContent = `Envoyée à ${losers.length} participant(s) — vérification en cours…`;
-            statusEl.style.color = "var(--stone)";
-            pollDelivery(out.notification_ids, losers.length, statusEl);
-          } catch(e) {
-            statusEl.textContent = "Erreur : " + (e?.message || String(e));
-            statusEl.className = "lose-status err";
-          } finally {
-            btn.disabled = false; btn.textContent = "📣 Envoyer aux autres";
-          }
-        };
+        openDraw.winner = { prenom: w.prenom, email: w.email };
+        wireWinnerUI(w);
       }
     }, 90);
   };
