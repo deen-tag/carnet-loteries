@@ -617,16 +617,14 @@ async function renderPublic(id){
       const dupData = await dupRes.json().catch(() => ({}));
       let already = !!(dupRes.ok && dupData.exists);
       if (!already) {
-        try {
-          // ID déterministe (tirage + email) : si deux soumissions arrivent en
-          // même temps, Firestore refuse la seconde écriture (règle "update: false"
-          // sur un doc déjà existant) au lieu de créer un doublon.
-          await setDoc(doc(db, "participants", `${drawId}_${emailLower}`), {
-            drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, ts: serverTimestamp()
-          });
-        } catch (e) {
-          already = true;
-        }
+        // ID déterministe (tirage + email) : si deux soumissions arrivent en
+        // même temps, Firestore refuse la seconde écriture (règle "update: false"
+        // sur un doc déjà existant) — mais on ne masque plus cette erreur en la
+        // confondant avec un vrai échec d'enregistrement : si ça plante pour une
+        // autre raison, on veut le voir, pas prétendre que tout s'est bien passé.
+        await setDoc(doc(db, "participants", `${drawId}_${emailLower}`), {
+          drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, ts: serverTimestamp()
+        });
       }
 
       // met à jour la base clients PERMANENTE de ce commerçant (indépendante
@@ -724,7 +722,9 @@ async function renderPublic(id){
         }
       };
     }catch(e){
-      errEl.textContent = "Le ticket n'a pas pu être enregistré. Réessaie.";
+      console.error("[tiketo] échec enregistrement ticket:", e);
+      const detail = (e && e.message) ? e.message : String(e);
+      errEl.textContent = "Le ticket n'a pas pu être enregistré. Réessaie. (" + detail.slice(0, 120) + ")";
       btn.disabled = false; btn.textContent = "Valider mon ticket";
     }
   };
