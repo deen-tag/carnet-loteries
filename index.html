@@ -150,6 +150,13 @@ const restoId = params.get("resto");
 const SUPER_ADMIN_EMAIL = "deentag.pro@gmail.com";
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+// code court et facile à relire à l'oral en cas de souci de scan (sans 0/O/1/I ambigus)
+function genWinnerCode(){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i=0;i<6;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
 function clientDocId(rid, email){ return `${rid}_${email.trim().toLowerCase()}`; }
 
 function toast(msg, ms=2200){
@@ -510,6 +517,32 @@ async function renderPublic(id){
     if (resultKind === "win") { heading = "🎉 Bravo !"; sub = `${data.name} va te contacter pour ton lot. Merci d'avoir participé !`; }
     else if (resultKind === "lose") { heading = "Merci d'avoir participé !"; sub = `Le sort a désigné quelqu'un d'autre cette fois-ci. ${data.name} t'invite à retenter ta chance au prochain tirage — à bientôt !`; }
     else { heading = data.name; sub = "Merci d'être abonné(e) aux offres. À bientôt !"; }
+
+    // ---- talon de vérification : uniquement si on a un vrai tirage + code ----
+    let verifyBlock = "";
+    if (resultKind === "win") {
+      const drawId = params.get("draw"), code = params.get("code");
+      if (drawId && code) {
+        try {
+          const dSnap = await getDoc(doc(db,"draws",drawId));
+          if (dSnap.exists()) {
+            const dData = dSnap.data();
+            if (dData.restaurantId === id && dData.winner && dData.winner.code === code) {
+              const verifyPayload = `TIKETO-VERIFY|${id}|${drawId}|${code}`;
+              const verifyQr = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=10&color=20-29-31&data=${encodeURIComponent(verifyPayload)}`;
+              verifyBlock = `
+                <div class="perf" style="margin:24px -24px;"></div>
+                <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--gold);display:block;margin-bottom:12px;">Talon de vérification</span>
+                <img src="${verifyQr}" width="150" height="150" style="border-radius:6px;border:1px solid var(--line);display:block;margin:0 auto 12px;">
+                <p style="font-size:12.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:0 0 8px;">Montre ce QR au commerçant pour récupérer ton lot.</p>
+                <p class="ticket-no" style="font-size:20px;color:var(--stamp);letter-spacing:.06em;margin:0;">${esc(code)}</p>
+                <p style="font-size:10.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:4px 0 0;">Ou donne-lui simplement ce code.</p>`;
+            }
+          }
+        } catch(e) { /* pas de talon si la vérif échoue — le message de base reste affiché */ }
+      }
+    }
+
     const unsubBlock = isPromoClick ? `
       <div id="unsub-wrap" style="margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);">
         <p style="font-size:11.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:0 0 10px;">Tu ne veux plus recevoir ces offres ?</p>
@@ -528,6 +561,7 @@ async function renderPublic(id){
             <h1 class="display" style="font-size:26px;margin:20px 0 8px;">${esc(heading)}</h1>
             <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">${esc(sub)}</p>
             ${unsubBlock}
+            ${verifyBlock}
           </div>
         </div>
       </div>`;
@@ -1099,6 +1133,116 @@ function openNewDrawModal(id, restoName, oldDrawId, onDone){
   };
 }
 
+function openVerifyWinnerModal(restoId){
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.innerHTML = `
+    <div class="card" style="max-width:380px;width:100%;">
+      <span class="stamp stamp-gold">Vérification</span>
+      <h3 class="display" style="margin:12px 0 6px;">Vérifier un gagnant</h3>
+      <p style="font-size:13px;color:var(--stone);margin:0 0 16px;font-family:'IBM Plex Mono',monospace;">
+        Scanne le QR affiché par le client, ou entre son code à la main.
+      </p>
+      <div id="vw-reader" style="border-radius:6px;overflow:hidden;border:1px solid var(--line);margin-bottom:14px;"></div>
+      <p id="vw-cam-err" class="err" style="display:none;margin:0 0 12px;"></p>
+      <label class="field">OU ENTRE LE CODE</label>
+      <input type="text" id="vw-code" placeholder="AB2CDE" style="margin-bottom:12px;text-transform:uppercase;">
+      <div id="vw-result" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;" id="vw-cancel">Fermer</button>
+        <button class="btn btn-primary" style="flex:1;" id="vw-check">Vérifier</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+
+  let scanner = null;
+  const closeAll = () => {
+    if (scanner) { try{ scanner.stop().catch(()=>{}).finally(()=>{ try{scanner.clear();}catch{} }); }catch{} }
+    bg.remove();
+  };
+  bg.onclick = (e) => { if (e.target === bg) closeAll(); };
+  document.getElementById("vw-cancel").onclick = closeAll;
+
+  const codeInput = document.getElementById("vw-code");
+  const resultEl = document.getElementById("vw-result");
+
+  async function runVerify(rawCode, drawIdHint){
+    const code = (rawCode || "").trim().toUpperCase();
+    if (!code){ resultEl.innerHTML = `<p class="err" style="margin:0;">Entre ou scanne un code.</p>`; return; }
+    resultEl.innerHTML = `<p style="font-size:12px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:0;">Vérification…</p>`;
+    try{
+      const idToken = await auth.currentUser.getIdToken();
+      // retrouve le tirage correspondant à ce code pour ce commerce si le
+      // QR scanné ne l'indiquait pas déjà (cas d'une saisie manuelle)
+      let drawId = drawIdHint;
+      if (!drawId) {
+        const snap = await getDocs(query(collection(db,"draws"), where("restaurantId","==",restoId)));
+        const match = snap.docs.find(d => d.data().winner && d.data().winner.code === code);
+        if (!match){ resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">❌ Code invalide pour ce commerce.</p>`; return; }
+        drawId = match.id;
+      }
+      const r = await fetch("/api/verify-winner", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ idToken, resto_id: restoId, drawId, code })
+      });
+      const out = await r.json();
+      if (out.ok){
+        resultEl.innerHTML = `<div class="winner-reveal" style="text-align:center;padding:16px 0;background:var(--paper-deep);border-radius:6px;">
+          <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">✅ GAGNANT CONFIRMÉ</p>
+          <p class="display" style="font-size:22px;color:var(--stamp);margin:6px 0;animation:stampIn .5s ease;">${esc(out.prenom||"")}</p>
+          ${out.prize ? `<p class="mono" style="font-size:12px;color:var(--stone);margin:0;">${esc(out.prize)}</p>` : ""}
+        </div>`;
+        confettiBurst(resultEl.querySelector(".winner-reveal"));
+        if (scanner) { try{ scanner.pause(true); }catch{} }
+      } else if (out.error === "already_claimed") {
+        resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">⚠️ Déjà réclamé${out.prenom ? " par " + esc(out.prenom) : ""}.</p>`;
+      } else {
+        resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">❌ ${esc(out.message || out.error || "Code invalide.")}</p>`;
+      }
+    }catch(e){
+      resultEl.innerHTML = `<p class="err" style="margin:0;">Erreur : ${esc(e?.message || String(e))}</p>`;
+    }
+  }
+
+  document.getElementById("vw-check").onclick = () => runVerify(codeInput.value, null);
+
+  // scanner caméra chargé à la demande — si la caméra est indisponible ou
+  // refusée, la saisie manuelle du code reste toujours possible.
+  (async () => {
+    try{
+      if (!window.Html5Qrcode) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+      scanner = new Html5Qrcode("vw-reader");
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 220 },
+        (decodedText) => {
+          const parts = decodedText.split("|");
+          if (parts[0] === "TIKETO-VERIFY" && parts[1] === restoId && parts[3]) {
+            codeInput.value = parts[3];
+            runVerify(parts[3], parts[2]);
+          } else {
+            codeInput.value = decodedText;
+          }
+        },
+        () => {} // erreurs de frame ignorées (normal entre 2 scans, pas d'action à prendre)
+      );
+    }catch(e){
+      const errEl = document.getElementById("vw-cam-err");
+      errEl.style.display = "block";
+      errEl.textContent = "Caméra indisponible — entre le code manuellement.";
+      const readerEl = document.getElementById("vw-reader");
+      if (readerEl) readerEl.style.display = "none";
+    }
+  })();
+}
+
 async function renderDetailInline(id, data, container){
   const publicUrl = `${window.location.origin}${window.location.pathname}?resto=${id}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=340x340&margin=10&color=20-29-31&data=${encodeURIComponent(publicUrl)}`;
@@ -1124,6 +1268,10 @@ async function renderDetailInline(id, data, container){
         </div>
         <p style="font-size:12px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">Le lien/QR ne change jamais, même entre 2 tirages.</p>
       </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <button class="btn btn-secondary verify-winner-btn" style="width:100%;">🔍 Vérifier un gagnant</button>
     </div>
 
     <div class="perf" style="margin:22px -20px;"></div>
@@ -1252,6 +1400,8 @@ async function renderDetailInline(id, data, container){
     a.download = `qr-${data.name.replace(/[^a-z0-9]+/gi,"-")}.png`;
     document.body.appendChild(a); a.click(); a.remove();
   };
+
+  container.querySelector(".verify-winner-btn").onclick = () => openVerifyWinnerModal(id);
 
   const reload = async () => {
     if (container._unsub) { container._unsub.forEach(u => u()); container._unsub = null; }
@@ -1410,7 +1560,7 @@ async function renderDetailInline(id, data, container){
         const idToken = await auth.currentUser.getIdToken();
         const r = await fetch("/api/send-promo", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken, external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win" })
+          body: JSON.stringify({ idToken, external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win", drawId: openDraw.id, code: w.code })
         });
         const out = await r.json();
         if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
@@ -1485,10 +1635,11 @@ async function renderDetailInline(id, data, container){
 
         // on fige tout de suite l'état local pour bloquer un double-clic
         // pendant que l'écriture Firestore est encore en vol
-        openDraw.winner = { prenom: w.prenom, email: w.email };
+        const winnerData = { prenom: w.prenom, email: w.email, code: genWinnerCode(), claimed: false };
+        openDraw.winner = winnerData;
         if (drawBtnEl) drawBtnEl.remove();
-        updateDoc(doc(db,"draws",openDraw.id), { winner: { prenom: w.prenom, email: w.email } }).catch(()=>{});
-        wireWinnerUI(w);
+        updateDoc(doc(db,"draws",openDraw.id), { winner: winnerData }).catch(()=>{});
+        wireWinnerUI(winnerData);
       }
     }, 90);
   };
