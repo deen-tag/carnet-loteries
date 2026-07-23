@@ -28,6 +28,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Clé de service Firebase non configurée sur Vercel" });
   }
 
+  let restoName = "";
   try {
     // Vérifie que l'appelant est authentifié ET propriétaire de ce commerçant
     // (ou super-admin), pour empêcher n'importe qui d'envoyer des pushs à
@@ -35,12 +36,14 @@ export default async function handler(req, res) {
     const decoded = await admin.auth().verifyIdToken(idToken);
     const callerEmail = (decoded.email || "").toLowerCase();
 
+    const restoSnap = await admin.firestore().collection("restaurants").doc(resto_id).get();
+    if (!restoSnap.exists) {
+      return res.status(404).json({ error: "Commerçant introuvable." });
+    }
+    const r = restoSnap.data();
+    restoName = r.name || "";
+
     if (callerEmail !== SUPER_ADMIN_EMAIL) {
-      const restoSnap = await admin.firestore().collection("restaurants").doc(resto_id).get();
-      if (!restoSnap.exists) {
-        return res.status(404).json({ error: "Commerçant introuvable." });
-      }
-      const r = restoSnap.data();
       const isOwner = ("ownerUid" in r)
         ? r.ownerUid === decoded.uid
         : (r.ownerEmail || "").toLowerCase() === callerEmail;
@@ -51,6 +54,11 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(401).json({ error: "Session invalide, reconnecte-toi." });
   }
+
+  // le nom du commerce est toujours ajouté devant le titre, pour que le
+  // client sache de qui vient le message même s'il a participé chez
+  // plusieurs commerces (le commerçant n'a pas à y penser lui-même).
+  const fullTitle = restoName ? `${restoName} — ${title}` : title;
 
   const siteOrigin = origin || "https://tiketo.vercel.app";
   let targetUrl = siteOrigin;
@@ -85,7 +93,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           app_id: APP_ID,
           target_channel: "push",
-          headings: { en: title, fr: title },
+          headings: { en: fullTitle, fr: fullTitle },
           contents: { en: message, fr: message },
           url: targetUrl,
           chrome_web_icon: `${siteOrigin}/logo.png`,
