@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Tiketo — Carnet des loteries</title>
+<title>Tiketo — Carnet de tickets</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Big+Shoulders+Stencil:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script defer src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"></script>
@@ -231,7 +231,7 @@ function renderAdminGate(){
       <div style="width:100%;max-width:360px;" class="anim-rise">
         <div class="card" style="border-radius:8px;text-align:center;">
           <img src="logo.png" alt="Tiketo" style="height:34px;margin-bottom:18px;">
-          <h1 class="display" style="font-size:20px;margin:0 0 16px;">Accès admin</h1>
+          <h1 class="display" style="font-size:20px;margin:0 0 16px;">Espace pro</h1>
           <input type="text" id="gate-email" placeholder="Email ou pseudo" style="margin-bottom:10px;" autocomplete="username">
           <input type="text" id="gate-pass" placeholder="Mot de passe" style="margin-bottom:6px;" autocomplete="current-password">
           <p style="text-align:right;margin:0 0 10px;"><a href="#" id="gate-forgot" style="font-size:12px;color:var(--stone);">Mot de passe oublié ?</a></p>
@@ -485,7 +485,7 @@ async function renderPublic(id){
   if (!rSnap.exists()){
     $app.innerHTML = `<div class="card anim-rise" style="text-align:center;max-width:340px;">
       <span class="stamp" style="margin-bottom:10px;">Introuvable</span>
-      <p class="display" style="margin:8px 0 0;">Ce commerçant n'existe pas (ou plus). Vérifie le QR code.</p>
+      <p class="display" style="margin:8px 0 0;">Ce commerce n'existe pas (ou plus). Vérifie le QR code.</p>
     </div>`;
     return;
   }
@@ -751,18 +751,18 @@ async function renderAdmin(user){
       <div>
         <img src="logo.png" alt="Tiketo" style="height:44px;margin-bottom:10px;">
         <p style="color:var(--stone);font-size:13px;margin:0;font-family:'IBM Plex Mono',monospace;">
-          ${isSuperAdmin ? "Vue d'ensemble — tous les commerçants" : esc(user.email)}
+          ${isSuperAdmin ? "Vue d'ensemble — tous les commerces" : esc(user.email)}
         </p>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-start;">
         <button class="btn btn-secondary" id="btn-account" style="font-size:12px;padding:8px 10px;">⚙️ Mon compte</button>
         <button class="btn btn-secondary" id="btn-logout" style="font-size:12px;padding:8px 10px;">Déconnexion</button>
-        ${isSuperAdmin ? `<button class="btn btn-primary" id="btn-add">+ Nouveau commerçant</button>` : ""}
+        ${isSuperAdmin ? `<button class="btn btn-primary" id="btn-add">+ Nouveau commerce</button>` : ""}
       </div>
     </div>
     <div id="stats-bar" class="anim-rise" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;"></div>
     <div id="search-wrap" class="anim-rise hidden" style="margin-bottom:16px;">
-      <input type="text" id="search-input" placeholder="Rechercher un commerçant…">
+      <input type="text" id="search-input" placeholder="Rechercher un commerce…">
     </div>
     <div id="list" class="grid"><p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;">Chargement…</p></div>
     <div id="detail"></div>
@@ -808,7 +808,7 @@ async function loadList(user, isSuperAdmin){
   }
 
   document.getElementById("stats-bar").innerHTML =
-    statChip(isSuperAdmin ? "Commerçants" : "Ton commerce", allRestos.length) + statChip("Clients", allRestos.reduce((s,{id}) => s + (allClientCounts[id]||0), 0));
+    statChip(isSuperAdmin ? "Commerces" : "Ton commerce", allRestos.length) + statChip("Clients", allRestos.reduce((s,{id}) => s + (allClientCounts[id]||0), 0));
   document.getElementById("search-wrap").classList.toggle("hidden", allRestos.length < 5);
 
   renderList("");
@@ -821,8 +821,8 @@ function renderList(filterText){
 
   if (allRestos.length === 0){
     listEl.innerHTML = `<div class="card anim-rise" style="text-align:center;">
-      <p class="display" style="font-size:18px;">Aucun commerçant pour l'instant</p>
-      <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">Crée ton premier commerçant pour générer son QR code.</p>
+      <p class="display" style="font-size:18px;">Aucun commerce pour l'instant</p>
+      <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">Crée ton premier commerce pour générer son QR code.</p>
     </div>`;
     return;
   }
@@ -995,7 +995,7 @@ function openAddModal(){
   bg.innerHTML = `
     <div class="card" style="max-width:380px;width:100%;">
       <span class="stamp">Nouveau ticket</span>
-      <h3 class="display" style="margin:12px 0 16px;">Nouveau commerçant</h3>
+      <h3 class="display" style="margin:12px 0 16px;">Nouveau commerce</h3>
       <label class="field">NOM DU COMMERCE</label>
       <input type="text" id="m-name" placeholder="Pizzeria Bella" style="margin-bottom:14px;">
       <label class="field">EMAIL DU COMMERÇANT (son accès pour se connecter)</label>
@@ -1047,7 +1047,7 @@ function openNewDrawModal(id, restoName, oldDrawId, onDone){
   bg.className = "modal-bg";
   bg.innerHTML = `
     <div class="card" style="max-width:380px;width:100%;">
-      <span class="stamp">Nouveau round</span>
+      <span class="stamp">Nouveau ticket</span>
       <h3 class="display" style="margin:12px 0 6px;">Nouveau tirage</h3>
       <p style="font-size:13px;color:var(--stone);margin:0 0 16px;font-family:'IBM Plex Mono',monospace;">
         L'ancien tirage sera clôturé et archivé. Les clients devront rescanner le QR pour participer à celui-ci.
@@ -1193,7 +1193,7 @@ async function renderDetailInline(id, data, container){
     <details class="section">
     <summary>Clients <span class="live-client-count">(0)</span></summary>
     <div style="padding-top:10px;">
-      <p style="font-size:11px;color:var(--stone);margin:0 0 10px;font-family:'IBM Plex Mono',monospace;">Base permanente de ce commerçant, tous tirages confondus — différent du nombre d'inscrits à un tirage précis.</p>
+      <p style="font-size:11px;color:var(--stone);margin:0 0 10px;font-family:'IBM Plex Mono',monospace;">Base permanente de ce commerce, tous tirages confondus — différent du nombre d'inscrits à un tirage précis.</p>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <button class="btn btn-secondary copy-list-btn" style="font-size:12px;padding:8px 10px;">📋 Copier</button>
         <button class="btn btn-secondary csv-btn" style="font-size:12px;padding:8px 10px;">⬇️ CSV</button>
