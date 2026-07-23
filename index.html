@@ -93,6 +93,12 @@
 
   .ticket-no{font-family:'Big Shoulders Stencil',sans-serif;font-weight:800;line-height:.85;color:var(--ink);}
 
+  .winners-scroll{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;margin:0 -2px;scrollbar-width:thin;}
+  .winners-scroll::-webkit-scrollbar{height:5px;}
+  .winners-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px;}
+  .win-ticket{scroll-snap-align:start;flex:0 0 auto;width:132px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px 12px 12px;margin-right:12px;position:relative;box-shadow:0 1px 0 var(--line), 0 8px 16px -12px rgba(32,41,31,.35);}
+  .win-ticket::after{content:"";position:absolute;top:0;right:-1px;bottom:0;width:9px;background-image:radial-gradient(circle 4px, var(--paper-deep) 4px, transparent 4.3px);background-repeat:repeat-y;background-position:center 8px;background-size:18px 18px;}
+
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   @keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -342,12 +348,11 @@ async function fetchRecentWinners(limitN){
 }
 
 function winnerRowHtml(w){
-  return `<div class="participant-row" style="align-items:flex-start;">
-    <div>
-      <div style="font-weight:600;font-family:'Fraunces',serif;font-size:14px;">${esc(w.prenom)}</div>
-      <div style="color:var(--stone);font-size:11px;">${esc(w.resto)} · ${esc(w.date)}</div>
-    </div>
-    <div style="color:var(--stamp);font-size:11px;text-align:right;max-width:40%;">${esc(w.prize)}</div>
+  return `<div class="win-ticket">
+    <span class="mono" style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--gold);display:block;margin-bottom:6px;">🎟 Gagnant</span>
+    <div class="display" style="font-weight:600;font-size:15px;line-height:1.25;margin-bottom:6px;">${esc(w.prenom)}</div>
+    <div style="font-size:11px;color:var(--ink);line-height:1.4;margin-bottom:8px;">${esc(w.resto)}<br><span style="color:var(--stamp);">${esc(w.prize)}</span></div>
+    <div class="mono" style="font-size:9.5px;color:var(--stone);">${esc(w.date)}</div>
   </div>`;
 }
 
@@ -374,16 +379,16 @@ async function renderHome(){
         <span class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--stone);">Choisis ton talon</span>
         <span class="ticket-no" style="font-size:20px;color:var(--gold);">N° 0001</span>
       </div>
-      <div style="padding:22px 20px;">
+      <div style="padding:22px 20px 14px;">
         <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--carbon);display:block;margin-bottom:8px;">Talon commerçant</span>
         <h3 class="display" style="font-size:19px;margin:0 0 10px;">Tu as un commerce ?</h3>
-        <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 16px;">Affiche un QR code, tes clients tentent de gagner un lot de ton choix en un instant — et toi, tu construis discrètement ta base de clients. Tu tires le gagnant en un clic, et surtout : tu peux ensuite relancer tous tes clients quand tu veux, par notification push, pour annoncer une promo, un événement ou un nouveau tirage. Zéro app à installer, pour toi comme pour eux.</p>
+        <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 14px;">Affiche un QR code, tes clients tentent de gagner un lot de ton choix en un instant — et toi, tu construis discrètement ta base de clients. Tu tires le gagnant en un clic, et surtout : tu peux ensuite relancer tous tes clients quand tu veux, par notification push, pour annoncer une promo, un événement ou un nouveau tirage. Zéro app à installer, pour toi comme pour eux.</p>
         <a href="?admin=1" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Accéder à mon espace →</a>
 
-        <div style="margin-top:20px;border:1px solid var(--line);border-radius:6px;overflow:hidden;">
+        <div style="margin-top:14px;border:1px solid var(--line);border-radius:6px;overflow:hidden;">
           <img src="panneau.png" alt="Exemple de panneau Tiketo à poser en boutique" style="width:100%;display:block;">
         </div>
-        <p class="mono" style="font-size:11px;color:var(--stone);margin:10px 0 0;line-height:1.6;">Un panneau prêt à poser sur ton comptoir — tes clients scannent ou approchent leur téléphone, sans rien installer.</p>
+        <p class="mono" style="font-size:11px;color:var(--stone);margin:8px 0 0;line-height:1.5;">Un panneau prêt à poser sur ton comptoir — tes clients scannent ou approchent leur téléphone, sans rien installer.</p>
       </div>
       <div class="perf" style="margin:0 -20px;"></div>
       <div style="padding:22px 20px;">
@@ -399,7 +404,7 @@ async function renderHome(){
         <h3 class="display" style="font-size:17px;margin:0;">Derniers gagnants</h3>
         <a href="?winners=1" style="font-size:11px;font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">Chercher un commerce →</a>
       </div>
-      <div id="home-winners"><p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Chargement…</p></div>
+      <div id="home-winners" class="winners-scroll"><p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Chargement…</p></div>
     </div>
 
     <div style="text-align:center;margin-top:34px;">
