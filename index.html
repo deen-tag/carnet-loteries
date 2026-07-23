@@ -876,7 +876,7 @@ function renderList(filterText){
           getDocs(query(collection(db,"clients"), where("restaurantId","==",id)))
         ]);
         const participantsSnaps = await Promise.all(
-          drawsSnap.docs.map(d => getDocs(query(collection(db,"participants"), where("drawId","==",d.id))))
+          drawsSnap.docs.map(d => getDocs(query(collection(db,"participants"), where("restaurantId","==",id), where("drawId","==",d.id))))
         );
         const deletions = [
           ...drawsSnap.docs.map(d => deleteDoc(doc(db,"draws",d.id))),
@@ -1071,7 +1071,7 @@ function openNewDrawModal(id, restoName, oldDrawId, onDone){
     btn.disabled = true; btn.textContent = "…";
     try{
       if (oldDrawId) {
-        const partSnap = await getDocs(query(collection(db,"participants"), where("drawId","==",oldDrawId)));
+        const partSnap = await getDocs(query(collection(db,"participants"), where("restaurantId","==",id), where("drawId","==",oldDrawId)));
         await updateDoc(doc(db,"draws",oldDrawId), {
           status: "closed", closedAt: serverTimestamp(), participantCountAtClose: partSnap.size
         });
@@ -1217,7 +1217,7 @@ async function renderDetailInline(id, data, container){
       listEl.style.display = "block";
       listEl.innerHTML = `<p class="mono" style="font-size:11px;color:var(--stone);">Chargement…</p>`;
       try {
-        const pSnap = await getDocs(query(collection(db,"participants"), where("drawId","==",drawId)));
+        const pSnap = await getDocs(query(collection(db,"participants"), where("restaurantId","==",id), where("drawId","==",drawId)));
         const list = pSnap.docs.map(d => d.data());
         listEl.innerHTML = list.length === 0
           ? `<p class="mono" style="font-size:11px;color:var(--stone);">Personne n'était inscrit.</p>`
@@ -1361,7 +1361,7 @@ async function renderDetailInline(id, data, container){
 
   // ---- participants du tirage en cours (pour tirage au sort) ----
   let drawParticipants = [];
-  const drawUnsub = onSnapshot(query(collection(db,"participants"), where("drawId","==",openDraw.id)), (snap) => {
+  const drawUnsub = onSnapshot(query(collection(db,"participants"), where("restaurantId","==",id), where("drawId","==",openDraw.id)), (snap) => {
     drawParticipants = snap.docs.map(d => d.data());
     const el = container.querySelector(".live-draw-count");
     if (el) el.textContent = `(${drawParticipants.length})`;
