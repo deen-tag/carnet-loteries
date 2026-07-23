@@ -131,7 +131,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, getDocs, getDoc, query, where,
-  serverTimestamp, deleteDoc, doc, setDoc, updateDoc, onSnapshot
+  serverTimestamp, deleteDoc, doc, setDoc, updateDoc, onSnapshot, getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -177,6 +177,27 @@ function configMissing(){
   return Object.values(firebaseConfig).some(v => String(v).includes("REMPLACE_MOI"));
 }
 
+// ---------- FILET DE SÉCURITÉ GÉNÉRIQUE ----------
+// Si un rendu plante (Firestore, réseau, permissions...), on affiche un
+// message clair avec un bouton "Réessayer" plutôt que de laisser l'écran
+// bloqué sur "Chargement…" indéfiniment.
+function showFatalError(e){
+  console.error("[tiketo] erreur:", e);
+  $app.style.display = ""; $app.style.alignItems = ""; $app.style.justifyContent = ""; $app.style.minHeight = "";
+  $app.innerHTML = `
+    <div class="card anim-rise" style="text-align:center;max-width:380px;margin:40px auto;">
+      <span class="stamp">Erreur</span>
+      <h1 class="display" style="font-size:20px;margin:12px 0 8px;">Un problème est survenu</h1>
+      <p style="color:var(--stone);font-size:13px;font-family:'IBM Plex Mono',monospace;">${esc(e?.message || String(e))}</p>
+      <button class="btn btn-primary" style="margin-top:14px;width:100%;" id="fatal-retry">Réessayer</button>
+    </div>`;
+  document.getElementById("fatal-retry").onclick = () => location.reload();
+}
+async function safeRun(fn){
+  try { await fn(); }
+  catch(e){ showFatalError(e); }
+}
+
 if (configMissing()) {
   $app.innerHTML = `
     <div class="card anim-rise">
@@ -189,17 +210,21 @@ if (configMissing()) {
       </p>
     </div>`;
 } else if (params.get("about") === "1") {
-  renderAbout();
+  safeRun(renderAbout);
+} else if (params.get("winners") === "1") {
+  safeRun(renderWinnersSearch);
 } else if (restoId) {
-  renderPublic(restoId);
+  safeRun(() => renderPublic(restoId));
+} else if (params.get("admin") === "1") {
+  safeRun(renderAdminGate);
 } else {
-  renderAdminGate();
+  safeRun(renderHome);
 }
 
 // ================= PROTECTION ADMIN (Firebase Authentication) =================
 function renderAdminGate(){
   onAuthStateChanged(auth, (user) => {
-    if (user) { renderAdmin(user); return; }
+    if (user) { renderAdmin(user).catch(showFatalError); return; }
     document.body.style.background = "var(--ink)";
     $app.style.display="flex"; $app.style.alignItems="center"; $app.style.justifyContent="center"; $app.style.minHeight="100vh";
     $app.innerHTML = `
@@ -288,6 +313,168 @@ function renderAbout(){
     </div>`;
 }
 
+// ================= ACCUEIL PUBLIC =================
+async function fetchRecentWinners(limitN){
+  // Volume faible (un tirage actif à la fois par commerce) : un filtre/tri
+  // côté client suffit, pas besoin d'index Firestore ni de pagination ici.
+  const drawsSnap = await getDocs(query(collection(db,"draws"), where("status","==","closed")));
+  const rows = drawsSnap.docs
+    .map(d => d.data())
+    .filter(d => d.winner && d.winner.publicOptIn && d.closedAt)
+    .sort((a,b) => (b.closedAt?.toMillis?.()||0) - (a.closedAt?.toMillis?.()||0))
+    .slice(0, limitN);
+
+  if (rows.length === 0) return [];
+
+  const restoIds = [...new Set(rows.map(r => r.restaurantId))];
+  const restoNames = {};
+  await Promise.all(restoIds.map(async (rid) => {
+    const s = await getDoc(doc(db,"restaurants",rid));
+    restoNames[rid] = s.exists() ? s.data().name : "Commerce";
+  }));
+
+  return rows.map(r => ({
+    prenom: r.winner.prenom,
+    resto: restoNames[r.restaurantId] || "Commerce",
+    date: r.closedAt?.toDate ? r.closedAt.toDate().toLocaleDateString("fr-FR", { day:"numeric", month:"long", year:"numeric" }) : "",
+    prize: r.prize
+  }));
+}
+
+function winnerRowHtml(w){
+  return `<div class="participant-row" style="align-items:flex-start;">
+    <div>
+      <div style="font-weight:600;font-family:'Fraunces',serif;font-size:14px;">${esc(w.prenom)}</div>
+      <div style="color:var(--stone);font-size:11px;">${esc(w.resto)} · ${esc(w.date)}</div>
+    </div>
+    <div style="color:var(--stamp);font-size:11px;text-align:right;max-width:40%;">${esc(w.prize)}</div>
+  </div>`;
+}
+
+async function renderHome(){
+  document.body.style.background = "";
+  $app.style.display = ""; $app.style.alignItems = ""; $app.style.justifyContent = ""; $app.style.minHeight = "";
+  $app.innerHTML = `
+    <div class="anim-rise" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;">
+      <img src="logo.png" alt="Tiketo" style="height:26px;">
+      <a href="?admin=1" class="btn btn-secondary" style="font-size:12px;padding:8px 14px;text-decoration:none;">Se connecter</a>
+    </div>
+
+    <div class="anim-rise">
+      <span class="stamp">🎟 carnet de tickets</span>
+      <h1 class="display" style="font-size:30px;line-height:1.18;margin:16px 0 12px;">Un ticket, une chance,<br>un lien qui dure.</h1>
+      <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;line-height:1.6;margin:0 0 18px;max-width:46ch;">Le carnet de tirages au sort qui rapproche les commerces de quartier et leurs clients — un QR code à la fois.</p>
+      <p style="font-size:15px;line-height:1.75;margin:0 0 26px;max-width:56ch;">Tiketo permet à n'importe quel commerce — restaurant, café, boutique — d'organiser des mini-tirages au sort en salle. Tu scannes, tu tentes ta chance en 10 secondes, et si tu gagnes, tu es prévenu direct par email et notification. Simple, gratuit, sans app à installer.</p>
+    </div>
+
+    <div class="perf" style="margin:0 -20px 26px;"></div>
+
+    <div class="card anim-rise" style="padding:0;overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px dashed var(--line);">
+        <span class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--stone);">Choisis ton talon</span>
+        <span class="ticket-no" style="font-size:20px;color:var(--gold);">N° 0001</span>
+      </div>
+      <div style="padding:22px 20px;">
+        <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--carbon);display:block;margin-bottom:8px;">Talon commerçant</span>
+        <h3 class="display" style="font-size:19px;margin:0 0 10px;">Tu as un commerce ?</h3>
+        <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 16px;">Affiche un QR code, tes clients tentent de gagner un lot de ton choix en un instant — et toi, tu construis discrètement ta base de clients. Tu tires le gagnant en un clic, et surtout : tu peux ensuite relancer tous tes clients quand tu veux, par notification push, pour annoncer une promo, un événement ou un nouveau tirage. Zéro app à installer, pour toi comme pour eux.</p>
+        <a href="?admin=1" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Accéder à mon espace →</a>
+      </div>
+      <div class="perf" style="margin:0 -20px;"></div>
+      <div style="padding:22px 20px;">
+        <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--stamp);display:block;margin-bottom:8px;">Talon joueur</span>
+        <h3 class="display" style="font-size:19px;margin:0 0 10px;">Tu as tenté ta chance ?</h3>
+        <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 12px;">Le résultat arrive directement par email et notification — pas besoin de revenir vérifier. Envie de retenter ta chance ? Rescanne le QR code du commerce.</p>
+        <a href="?winners=1" style="font-size:12px;font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;color:var(--stamp);">Vérifier les gagnants d'un commerce →</a>
+      </div>
+    </div>
+
+    <div class="anim-rise" style="margin-top:28px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;">
+        <h3 class="display" style="font-size:17px;margin:0;">Derniers gagnants</h3>
+        <a href="?winners=1" style="font-size:11px;font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">Chercher un commerce →</a>
+      </div>
+      <div id="home-winners"><p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Chargement…</p></div>
+    </div>
+
+    <div style="text-align:center;margin-top:34px;">
+      <a href="?about=1" style="font-size:11px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">C'est quoi Tiketo, en détail ?</a>
+    </div>
+  `;
+
+  const winnersEl = document.getElementById("home-winners");
+  const rows = await fetchRecentWinners(6);
+  winnersEl.innerHTML = rows.length === 0
+    ? `<p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Aucun tirage clôturé pour l'instant — reviens bientôt !</p>`
+    : rows.map(winnerRowHtml).join("");
+}
+
+// ================= RECHERCHE DE GAGNANTS PAR COMMERCE =================
+async function renderWinnersSearch(){
+  document.body.style.background = "";
+  $app.style.display = ""; $app.style.alignItems = ""; $app.style.justifyContent = ""; $app.style.minHeight = "";
+  $app.innerHTML = `
+    <div class="anim-rise" style="margin-bottom:22px;">
+      <a href="?" style="font-size:12px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">← Retour à l'accueil</a>
+    </div>
+    <div class="anim-rise" style="margin-bottom:20px;">
+      <span class="stamp">🎟 vérifier un gain</span>
+      <h1 class="display" style="font-size:24px;margin:14px 0 8px;">Gagnants par commerce</h1>
+      <p style="color:var(--stone);font-size:13px;font-family:'IBM Plex Mono',monospace;">Tape le nom du commerce où tu as participé.</p>
+    </div>
+    <input type="text" id="w-search" placeholder="Ex : Pizzeria Bella" style="margin-bottom:14px;">
+    <div id="w-restos"></div>
+    <div id="w-results" style="margin-top:6px;"></div>
+  `;
+
+  const rSnap = await getDocs(collection(db,"restaurants"));
+  const restos = rSnap.docs.map(d => ({ id: d.id, name: d.data().name }));
+  const normalize = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+
+  const restosEl = document.getElementById("w-restos");
+  const resultsEl = document.getElementById("w-results");
+  const searchEl = document.getElementById("w-search");
+  searchEl.focus();
+
+  async function showRestoWinners(restoId, restoName){
+    resultsEl.innerHTML = `<p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Chargement…</p>`;
+    const drawsSnap = await getDocs(query(collection(db,"draws"), where("restaurantId","==",restoId), where("status","==","closed")));
+    const rows = drawsSnap.docs
+      .map(d => d.data())
+      .filter(d => d.winner)
+      .sort((a,b) => (b.closedAt?.toMillis?.()||0) - (a.closedAt?.toMillis?.()||0));
+
+    resultsEl.innerHTML = `<h3 class="display" style="font-size:16px;margin:18px 0 10px;">${esc(restoName)}</h3>` + (
+      rows.length === 0
+        ? `<p style="font-size:13px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">Aucun tirage clôturé pour l'instant chez ce commerce.</p>`
+        : rows.map(r => {
+            const date = r.closedAt?.toDate ? r.closedAt.toDate().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}) : (r.date || "");
+            const name = (r.winner && r.winner.publicOptIn) ? esc(r.winner.prenom) : "Gagnant anonyme";
+            return `<div class="participant-row" style="align-items:flex-start;">
+              <div>
+                <div style="font-weight:600;font-family:'Fraunces',serif;font-size:14px;">${name}</div>
+                <div style="color:var(--stone);font-size:11px;">${esc(date)}</div>
+              </div>
+              <div style="color:var(--stamp);font-size:11px;text-align:right;max-width:40%;">${esc(r.prize)}</div>
+            </div>`;
+          }).join("")
+    );
+  }
+
+  function renderMatches(){
+    const q = normalize(searchEl.value.trim());
+    if (!q){ restosEl.innerHTML = ""; resultsEl.innerHTML = ""; return; }
+    const matches = restos.filter(r => normalize(r.name).includes(q)).slice(0, 8);
+    restosEl.innerHTML = matches.length === 0
+      ? `<p style="font-size:12px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">Aucun commerce ne correspond.</p>`
+      : matches.map(r => `<button class="btn btn-secondary w-pick" data-id="${esc(r.id)}" data-name="${esc(r.name)}" style="width:100%;text-align:left;margin-bottom:6px;font-size:13px;">${esc(r.name)}</button>`).join("");
+    restosEl.querySelectorAll(".w-pick").forEach(btn => {
+      btn.onclick = () => showRestoWinners(btn.dataset.id, btn.dataset.name);
+    });
+  }
+  searchEl.oninput = renderMatches;
+}
+
 // ================= PUBLIC TICKET PAGE =================
 async function renderPublic(id){
   document.body.style.background = "var(--ink)";
@@ -313,6 +500,13 @@ async function renderPublic(id){
     if (resultKind === "win") { heading = "🎉 Bravo !"; sub = `${data.name} va te contacter pour ton lot. Merci d'avoir participé !`; }
     else if (resultKind === "lose") { heading = data.name; sub = `Tu n'as pas gagné cette fois, mais ${data.name} t'invite à retenter ta chance dans son établissement.`; }
     else { heading = data.name; sub = "Merci d'être abonné(e) aux offres. À bientôt !"; }
+    const unsubBlock = isPromoClick ? `
+      <div id="unsub-wrap" style="margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);">
+        <p style="font-size:11.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:0 0 10px;">Tu ne veux plus recevoir ces offres ?</p>
+        <input type="email" id="unsub-email" placeholder="ton@email.com" style="margin-bottom:8px;">
+        <button class="btn btn-secondary" id="unsub-btn" style="width:100%;font-size:12px;">Me désabonner</button>
+        <p id="unsub-msg" style="font-size:11.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:8px 0 0;"></p>
+      </div>` : "";
     $app.innerHTML = `
       <div style="width:100%;max-width:400px;" class="anim-rise">
         <div class="card" style="border-radius:8px;padding:0;overflow:hidden;">
@@ -323,9 +517,23 @@ async function renderPublic(id){
           <div style="padding:8px 24px 28px;text-align:center;">
             <h1 class="display" style="font-size:26px;margin:20px 0 8px;">${esc(heading)}</h1>
             <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;">${esc(sub)}</p>
+            ${unsubBlock}
           </div>
         </div>
       </div>`;
+    if (isPromoClick) {
+      document.getElementById("unsub-btn").onclick = async () => {
+        const em = document.getElementById("unsub-email").value.trim().toLowerCase();
+        const msgEl = document.getElementById("unsub-msg");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { msgEl.textContent = "Adresse email invalide."; return; }
+        try {
+          await setDoc(doc(db, "clients", clientDocId(id, em)), { wantsPromo: false }, { merge: true });
+          msgEl.textContent = "C'est fait, tu ne recevras plus d'offres de ce commerce.";
+        } catch (e) {
+          msgEl.textContent = "Un problème est survenu, réessaie plus tard.";
+        }
+      };
+    }
     return;
   }
 
@@ -372,8 +580,11 @@ async function renderPublic(id){
             <input type="text" id="f-prenom" placeholder="Ton prénom" style="margin-bottom:16px;">
             <label class="field">EMAIL</label>
             <input type="email" id="f-email" placeholder="ton@email.com" style="margin-bottom:16px;">
-            <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:18px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">
+            <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:12px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">
               <input type="checkbox" id="f-promo"> J'accepte de recevoir des offres de ${esc(data.name)} (facultatif)
+            </label>
+            <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:18px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">
+              <input type="checkbox" id="f-public"> J'accepte d'apparaître (prénom uniquement) dans la liste publique des gagnants si je gagne (facultatif)
             </label>
             <p id="f-err" class="err"></p>
             <button class="btn btn-primary" style="width:100%;" id="f-submit">Valider mon ticket</button>
@@ -389,6 +600,7 @@ async function renderPublic(id){
     const prenom = document.getElementById("f-prenom").value.trim();
     const email = document.getElementById("f-email").value.trim();
     const wantsPromo = document.getElementById("f-promo").checked;
+    const publicOptIn = document.getElementById("f-public").checked;
     const errEl = document.getElementById("f-err");
     errEl.textContent = "";
 
@@ -407,11 +619,18 @@ async function renderPublic(id){
         body: JSON.stringify({ drawId, email: emailLower })
       });
       const dupData = await dupRes.json().catch(() => ({}));
-      const already = !!(dupRes.ok && dupData.exists);
+      let already = !!(dupRes.ok && dupData.exists);
       if (!already) {
-        await addDoc(collection(db,"participants"), {
-          drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, ts: serverTimestamp()
-        });
+        try {
+          // ID déterministe (tirage + email) : si deux soumissions arrivent en
+          // même temps, Firestore refuse la seconde écriture (règle "update: false"
+          // sur un doc déjà existant) au lieu de créer un doublon.
+          await setDoc(doc(db, "participants", `${drawId}_${emailLower}`), {
+            drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, publicOptIn, ts: serverTimestamp()
+          });
+        } catch (e) {
+          already = true;
+        }
       }
 
       // met à jour la base clients PERMANENTE de ce commerçant (indépendante
@@ -565,17 +784,28 @@ function statChip(label, value){
 async function loadList(user, isSuperAdmin){
   user = user || currentUser;
   isSuperAdmin = (isSuperAdmin !== undefined) ? isSuperAdmin : currentIsSuperAdmin;
-  const [rSnap, cSnap] = await Promise.all([
-    getDocs(collection(db,"restaurants")),
-    getDocs(collection(db,"clients"))
-  ]);
-  allClientCounts = {};
-  cSnap.forEach(d => { const rid = d.data().restaurantId; allClientCounts[rid] = (allClientCounts[rid]||0)+1; });
+  const rSnap = await getDocs(collection(db,"restaurants"));
 
   const myEmail = (user.email || "").toLowerCase();
   allRestos = rSnap.docs
     .map(d => ({ id: d.id, data: d.data() }))
     .filter(({data}) => isSuperAdmin || data.ownerUid === user.uid || (!data.ownerUid && (data.ownerEmail || "").toLowerCase() === myEmail));
+
+  allClientCounts = {};
+  if (isSuperAdmin) {
+    // le super-admin peut tout lire d'un coup (autorisé par les règles Firestore)
+    const cSnap = await getDocs(collection(db,"clients"));
+    cSnap.forEach(d => { const rid = d.data().restaurantId; allClientCounts[rid] = (allClientCounts[rid]||0)+1; });
+  } else {
+    // un commerçant ne peut lire QUE ses propres clients (règles Firestore) —
+    // lire la collection entière plante désormais avec "permission-denied".
+    // On compte restaurant par restaurant avec une requête d'agrégation
+    // (ne télécharge aucun document, juste un nombre : rapide et léger).
+    await Promise.all(allRestos.map(async ({id}) => {
+      const cnt = await getCountFromServer(query(collection(db,"clients"), where("restaurantId","==",id)));
+      allClientCounts[id] = cnt.data().count;
+    }));
+  }
 
   document.getElementById("stats-bar").innerHTML =
     statChip(isSuperAdmin ? "Commerçants" : "Ton commerce", allRestos.length) + statChip("Clients", allRestos.reduce((s,{id}) => s + (allClientCounts[id]||0), 0));
@@ -1083,10 +1313,11 @@ async function renderDetailInline(id, data, container){
     btn.disabled = true; btn.textContent = "Envoi…";
     statusEl.textContent = ""; statusEl.className = "promo-status";
     try {
+      const idToken = await auth.currentUser.getIdToken();
       const r = await fetch("/api/send-promo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ external_ids: targets, title, message, resto_id: id, origin: window.location.origin })
+        body: JSON.stringify({ idToken, external_ids: targets, title, message, resto_id: id, origin: window.location.origin })
       });
       const out = await r.json();
       if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
@@ -1153,7 +1384,7 @@ async function renderDetailInline(id, data, container){
         </div>`;
         confettiBurst(box.querySelector(".winner-reveal"));
 
-        updateDoc(doc(db,"draws",openDraw.id), { winner: { prenom: w.prenom, email: w.email } }).catch(()=>{});
+        updateDoc(doc(db,"draws",openDraw.id), { winner: { prenom: w.prenom, email: w.email, publicOptIn: !!w.publicOptIn } }).catch(()=>{});
 
         const msgsWrap = container.querySelector(".winner-msgs");
         msgsWrap.classList.remove("hidden");
@@ -1174,9 +1405,10 @@ async function renderDetailInline(id, data, container){
           btn.disabled = true; btn.textContent = "Envoi…";
           statusEl.textContent = ""; statusEl.className = "win-status";
           try {
+            const idToken = await auth.currentUser.getIdToken();
             const r = await fetch("/api/send-promo", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win" })
+              body: JSON.stringify({ idToken, external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win" })
             });
             const out = await r.json();
             if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
@@ -1201,9 +1433,10 @@ async function renderDetailInline(id, data, container){
           btn.disabled = true; btn.textContent = "Envoi…";
           statusEl.textContent = ""; statusEl.className = "lose-status";
           try {
+            const idToken = await auth.currentUser.getIdToken();
             const r = await fetch("/api/send-promo", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ external_ids: losers, title, message, resto_id: id, origin: window.location.origin, result: "lose" })
+              body: JSON.stringify({ idToken, external_ids: losers, title, message, resto_id: id, origin: window.location.origin, result: "lose" })
             });
             const out = await r.json();
             if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
