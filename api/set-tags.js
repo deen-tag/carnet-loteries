@@ -1,3 +1,15 @@
+import admin from "firebase-admin";
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n")
+    })
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Méthode non autorisée" });
@@ -6,6 +18,22 @@ export default async function handler(req, res) {
   const { external_id, tags } = req.body || {};
   if (!external_id || !tags || typeof tags !== "object") {
     return res.status(400).json({ error: "external_id et tags sont requis" });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(external_id)) {
+    return res.status(400).json({ error: "external_id doit être une adresse email valide" });
+  }
+  // Cette route est appelée par le client final (pas un commerçant connecté),
+  // donc pas de vérif d'idToken possible ici. On limite quand même les
+  // dégâts : le tag ne peut viser qu'un commerce qui existe vraiment.
+  if (tags.resto_id) {
+    try {
+      const restoSnap = await admin.firestore().collection("restaurants").doc(String(tags.resto_id)).get();
+      if (!restoSnap.exists) {
+        return res.status(404).json({ error: "Commerçant introuvable." });
+      }
+    } catch (e) {
+      return res.status(500).json({ error: "Vérification du commerçant impossible." });
+    }
   }
 
   const REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;

@@ -1,11 +1,55 @@
+import admin from "firebase-admin";
+
+const SUPER_ADMIN_EMAIL = "deentag.pro@gmail.com";
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n")
+    })
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  const { external_ids, title, message, resto_id, origin, result } = req.body || {};
+  const { idToken, external_ids, title, message, resto_id, origin, result } = req.body || {};
+  if (!idToken || !resto_id) {
+    return res.status(400).json({ error: "idToken et resto_id sont requis" });
+  }
   if (!Array.isArray(external_ids) || external_ids.length === 0 || !title || !message) {
     return res.status(400).json({ error: "external_ids (liste non vide), title et message sont requis" });
+  }
+  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
+    return res.status(500).json({ error: "Clé de service Firebase non configurée sur Vercel" });
+  }
+
+  try {
+    // Vérifie que l'appelant est authentifié ET propriétaire de ce commerçant
+    // (ou super-admin), pour empêcher n'importe qui d'envoyer des pushs à
+    // n'importe quel client via cette route.
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const callerEmail = (decoded.email || "").toLowerCase();
+
+    if (callerEmail !== SUPER_ADMIN_EMAIL) {
+      const restoSnap = await admin.firestore().collection("restaurants").doc(resto_id).get();
+      if (!restoSnap.exists) {
+        return res.status(404).json({ error: "Commerçant introuvable." });
+      }
+      const r = restoSnap.data();
+      const isOwner = ("ownerUid" in r)
+        ? r.ownerUid === decoded.uid
+        : (r.ownerEmail || "").toLowerCase() === callerEmail;
+      if (!isOwner) {
+        return res.status(403).json({ error: "Tu n'es pas propriétaire de ce commerçant." });
+      }
+    }
+  } catch (e) {
+    return res.status(401).json({ error: "Session invalide, reconnecte-toi." });
   }
 
   const siteOrigin = origin || "https://tiketo.vercel.app";
