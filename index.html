@@ -1134,7 +1134,6 @@ async function renderDetailInline(id, data, container){
       <button class="btn btn-primary draw-btn">🎁 Tirer un gagnant <span class="live-draw-count"></span></button>
     </div>
     <p style="font-size:11px;color:var(--stone);margin:4px 0 0;font-family:'IBM Plex Mono',monospace;text-align:right;">Inscrits à CE tirage uniquement</p>
-    <p class="debug-draw-status" style="font-size:12px;color:var(--carbon);background:rgba(46,74,99,.08);padding:8px 10px;border-radius:4px;margin:6px 0 0;font-family:'IBM Plex Mono',monospace;word-break:break-word;">🔧 diagnostic : en attente…</p>
     ` : ""}
     <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">
       ${openDraw.winner
@@ -1368,16 +1367,12 @@ async function renderDetailInline(id, data, container){
     drawParticipants = snap.docs.map(d => d.data());
     const el = container.querySelector(".live-draw-count");
     if (el) el.textContent = `(${drawParticipants.length})`;
-    const dbg = container.querySelector(".debug-draw-status");
-    if (dbg) dbg.textContent = `🔧 diagnostic : lecture OK, ${snap.size} document(s) trouvé(s) pour ce tirage, à ${new Date().toLocaleTimeString("fr-FR")}`;
   }, (err) => {
     console.error("[tiketo] échec lecture participants du tirage:", err);
     const el = container.querySelector(".live-draw-count");
     if (el) el.textContent = " — erreur de lecture";
     const box = container.querySelector(".winner-box");
     if (box) box.innerHTML = `<span class="err">Impossible de lire les participants : ${esc(err?.message || String(err))}</span>`;
-    const dbg = container.querySelector(".debug-draw-status");
-    if (dbg) { dbg.textContent = `🔧 diagnostic : ERREUR — ${err?.code || ""} ${err?.message || String(err)}`; dbg.style.color = "var(--stamp)"; dbg.style.background = "rgba(168,52,31,.1)"; }
   });
 
   container._unsub = [clientsUnsub, drawUnsub];
