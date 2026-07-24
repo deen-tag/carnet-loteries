@@ -230,6 +230,8 @@ if (configMissing()) {
   safeRun(() => renderPublic(restoId));
 } else if (params.get("admin") === "1") {
   safeRun(renderAdminGate);
+} else if (params.get("legal")) {
+  safeRun(() => renderLegal(params.get("legal")));
 } else {
   safeRun(renderHome);
 }
@@ -326,6 +328,98 @@ function renderAbout(){
     </div>`;
 }
 
+// ================= PAGES LÉGALES (règlement / confidentialité / CGU) =================
+// NOTE : les champs entre crochets [ ] sont des placeholders à remplacer par
+// les informations réelles de l'éditeur (raison sociale/EI, SIRET, adresse,
+// email) dès que le statut juridique de Tiketo sera finalisé. Tant que ces
+// champs restent en l'état, ces pages n'ont pas de valeur légale complète.
+function ph(s){ return `<span style="color:var(--stamp);font-weight:600;">${esc(s)}</span>`; }
+
+const LEGAL_PAGES = {
+  reglement: {
+    title: "Règlement du tirage au sort",
+    html: `
+      <p style="font-size:12.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:0 0 18px;">
+        Ce règlement type s'applique à chaque tirage organisé sur Tiketo. Le commerçant organisateur en est seul responsable et peut le personnaliser (lot, dates, conditions particulières) depuis son espace de gestion.
+      </p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">Article 1 — Organisateur</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Chaque tirage est organisé par le commerce chez lequel il est proposé, via la plateforme technique Tiketo, éditée par ${ph("[Éditeur — raison sociale à préciser]")}, ${ph("[adresse]")}.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">Article 2 — Conditions de participation</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Participation gratuite et sans obligation d'achat, ouverte à toute personne majeure (ou mineure avec l'accord de son représentant légal). Une seule participation par personne et par tirage.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">Article 3 — Désignation du gagnant</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Le gagnant est désigné par tirage au sort aléatoire parmi les participants valides, à la clôture du tirage. Il est informé par email et notification, et dispose d'un délai raisonnable pour venir récupérer son lot en boutique avec son code de vérification.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">Article 4 — Responsabilité</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Le commerçant reste seul responsable du lot annoncé et de sa remise. Tiketo fournit uniquement l'outil technique de tirage et ne peut être tenu responsable d'un litige entre un commerçant et un participant.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">Article 5 — Données personnelles</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Les données collectées (prénom, email) sont traitées conformément à notre <a href="?legal=confidentialite" style="color:var(--stamp);">politique de confidentialité</a>.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">Article 6 — Loi applicable</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Droit français. Contact pour toute question : ${ph("[email de contact]")}.</p>
+    `
+  },
+  confidentialite: {
+    title: "Politique de confidentialité",
+    html: `
+      <p style="font-size:12.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:0 0 18px;">Dernière mise à jour : ${ph("[date]")}.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">1. Qui est responsable de vos données ?</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Le commerçant chez qui vous participez est responsable de sa base clients. Tiketo, édité par ${ph("[Éditeur]")} (${ph("[email de contact / DPO]")}), agit comme prestataire technique hébergeant ces données.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">2. Données collectées</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Prénom, email, choix de recevoir des offres (facultatif), résultat de votre participation, et un identifiant de notification si vous acceptez les notifications push (via OneSignal).</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">3. Pourquoi ?</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Faire fonctionner le tirage, vous informer du résultat, et, si vous l'acceptez, vous adresser des offres du commerçant.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">4. Qui y a accès ?</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Le commerçant concerné, l'équipe technique Tiketo, et nos prestataires d'hébergement (Google Firebase / Google Cloud) et de notification (OneSignal), susceptibles de traiter des données hors de l'Union européenne dans un cadre encadré juridiquement.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">5. Conservation</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Données du tirage conservées le temps du tirage + une durée limitée à des fins de preuve. Données de la base clients conservées tant que vous ne vous désinscrivez pas.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">6. Vos droits</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Accès, rectification, effacement, limitation, opposition, portabilité, retrait du consentement à tout moment. Vous pouvez vous désinscrire via le lien reçu par email, ou nous écrire à ${ph("[email de contact]")}. Réclamation possible auprès de la CNIL (cnil.fr).</p>
+    `
+  },
+  cgu: {
+    title: "Conditions générales d'utilisation (commerçants)",
+    html: `
+      <p style="font-size:12.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:0 0 18px;">Applicables aux commerçants utilisant la plateforme Tiketo pour organiser leurs tirages.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">1. Service</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Tiketo, édité par ${ph("[Éditeur]")}, fournit un outil technique de création et de gestion de tirages au sort en boutique.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">2. Obligations du commerçant</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Le commerçant reste seul organisateur et responsable de chaque tirage : rédaction d'un règlement conforme, remise effective des lots, respect du consentement des participants.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">3. Rôle de Tiketo</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Tiketo fournit l'infrastructure technique et n'intervient pas dans le choix des lots ni la remise des gains. Tiketo peut suspendre un compte en cas d'usage frauduleux ou non conforme.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">4. Tarifs</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Service proposé ${ph("[gratuitement / selon tarifs en vigueur]")} à ce jour, susceptible d'évoluer avec information préalable des commerçants.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">5. Données personnelles</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Le commerçant est responsable de traitement pour les données de ses participants ; Tiketo agit en sous-traitant technique, dans les conditions de notre <a href="?legal=confidentialite" style="color:var(--stamp);">politique de confidentialité</a>.</p>
+      <h3 class="display" style="font-size:16px;margin:18px 0 6px;">6. Droit applicable</h3>
+      <p style="font-size:13.5px;line-height:1.6;">Droit français. Contact : ${ph("[email de contact]")}.</p>
+    `
+  }
+};
+
+function renderLegal(type){
+  const page = LEGAL_PAGES[type] || LEGAL_PAGES.reglement;
+  document.body.style.background = "var(--ink)";
+  $app.style.display="flex"; $app.style.alignItems="center"; $app.style.justifyContent="center"; $app.style.minHeight="100vh";
+  $app.innerHTML = `
+    <div style="width:100%;max-width:460px;" class="anim-rise">
+      <div class="card" style="border-radius:8px;max-height:85vh;overflow-y:auto;">
+        <img src="logo.png" alt="Tiketo" style="height:60px;margin-bottom:14px;">
+        <h1 class="display" style="font-size:21px;margin:0 0 6px;">${esc(page.title)}</h1>
+        <div style="margin-top:10px;">${page.html}</div>
+        <div style="margin-top:22px;padding-top:14px;border-top:1px dashed var(--line);text-align:center;">
+          <a href="javascript:history.back()" style="font-size:12px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">← Retour</a>
+        </div>
+      </div>
+    </div>`;
+}
+
+function legalFooterHtml(){
+  return `
+    <div style="text-align:center;margin-top:22px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+      <a href="?legal=reglement" style="font-size:10.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">Règlement</a>
+      <a href="?legal=confidentialite" style="font-size:10.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">Confidentialité</a>
+      <a href="?legal=cgu" style="font-size:10.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">CGU commerçants</a>
+    </div>`;
+}
+
 // ================= ACCUEIL PUBLIC =================
 async function fetchRecentWinners(limitN){
   // Volume faible (un tirage actif à la fois par commerce) : un filtre/tri
@@ -417,6 +511,7 @@ async function renderHome(){
     <div style="text-align:center;margin-top:34px;">
       <a href="?about=1" style="font-size:11px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">C'est quoi Tiketo, en détail ?</a>
     </div>
+    ${legalFooterHtml()}
   `;
 
   const winnersEl = document.getElementById("home-winners");
@@ -549,6 +644,7 @@ async function renderPublic(id){
         <input type="email" id="unsub-email" placeholder="ton@email.com" style="margin-bottom:8px;">
         <button class="btn btn-secondary" id="unsub-btn" style="width:100%;font-size:12px;">Me désabonner</button>
         <p id="unsub-msg" style="font-size:11.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:8px 0 0;"></p>
+        <p style="font-size:10.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:10px 0 0;"><a href="?legal=confidentialite" style="color:var(--stamp);">Politique de confidentialité</a></p>
       </div>` : "";
     $app.innerHTML = `
       <div style="width:100%;max-width:400px;" class="anim-rise">
@@ -624,15 +720,19 @@ async function renderPublic(id){
             <input type="text" id="f-prenom" placeholder="Ton prénom" style="margin-bottom:16px;">
             <label class="field">EMAIL</label>
             <input type="email" id="f-email" placeholder="ton@email.com" style="margin-bottom:16px;">
-            <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:18px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">
+            <label style="display:flex;gap:10px;font-size:13px;color:var(--stone);margin-bottom:6px;cursor:pointer;font-family:'IBM Plex Mono',monospace;">
               <input type="checkbox" id="f-promo"> J'accepte de recevoir des offres de ${esc(data.name)} (facultatif)
             </label>
+            <p style="font-size:10.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;margin:0 0 18px;">
+              En participant, tu acceptes le <a href="?legal=reglement" target="_blank" style="color:var(--stamp);">règlement du tirage</a> et notre <a href="?legal=confidentialite" target="_blank" style="color:var(--stamp);">politique de confidentialité</a>.
+            </p>
             <p id="f-err" class="err"></p>
             <button class="btn btn-primary" style="width:100%;" id="f-submit">Valider mon ticket</button>
           </div>
         </div>
         <div style="text-align:center;padding:0 24px 18px;">
           <a href="?about=1" style="font-size:11px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">C'est quoi Tiketo ?</a>
+          ${legalFooterHtml()}
         </div>
       </div>
     </div>`;
