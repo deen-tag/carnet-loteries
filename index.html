@@ -311,28 +311,85 @@ function renderAdminGate(){
 
 // ================= PAGE D'EXPLICATION ("C'est quoi Tiketo ?") =================
 function renderAbout(){
-  document.body.style.background = "var(--ink)";
-  $app.style.display="flex"; $app.style.alignItems="center"; $app.style.justifyContent="center"; $app.style.minHeight="100vh";
+  document.body.style.background = "";
+  $app.style.display = ""; $app.style.alignItems = ""; $app.style.justifyContent = ""; $app.style.minHeight = "";
   $app.innerHTML = `
-    <div style="width:100%;max-width:420px;" class="anim-rise">
-      <div class="card" style="border-radius:8px;">
-        <img src="logo.png" alt="Tiketo" style="height:75px;margin-bottom:18px;">
-        <h1 class="display" style="font-size:24px;margin:0 0 14px;">C'est quoi Tiketo ?</h1>
-        <p style="font-size:14px;line-height:1.7;color:var(--ink);margin:0 0 12px;">
-          Tiketo est un simple outil utilisé par des commerces locaux (restaurants, cafés, boutiques...)
-          pour organiser des tirages au sort en salle, sans application à installer.
-        </p>
-        <p style="font-size:14px;line-height:1.7;color:var(--stone);margin:0 0 12px;font-family:'IBM Plex Mono',monospace;">
-          Le principe : le commerce affiche un QR code, tu le scannes, tu laisses ton prénom et ton email
-          pour participer au tirage — c'est tout. Aucune app, aucun compte à créer.
-        </p>
-        <p style="font-size:14px;line-height:1.7;color:var(--stone);margin:0 0 20px;font-family:'IBM Plex Mono',monospace;">
-          Tes informations ne servent qu'à ce commerce précis, pour te contacter en cas de gain ou t'envoyer
-          ses offres si tu l'as accepté. Rien n'est revendu ni partagé ailleurs.
-        </p>
-        <a href="javascript:history.back()" class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;">← Retour</a>
+    <div class="anim-rise" style="margin-bottom:22px;">
+      <a href="javascript:history.back()" style="font-size:12px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">← Retour</a>
+    </div>
+
+    <div class="anim-rise" style="margin-bottom:26px;">
+      <span class="stamp">🎁 pourquoi tiketo</span>
+      <h1 class="display" style="font-size:26px;line-height:1.22;margin:16px 0 10px;">Faire plaisir.<br>Créer du lien.</h1>
+      <p style="font-size:15px;line-height:1.75;margin:0;max-width:56ch;">Un commerce ne devrait pas avoir besoin de manipuler ses clients pour créer de la fidélité. Tiketo lui donne simplement une occasion de dire merci — et à ses clients, une chance de gagner quelque chose, sans rien acheter.</p>
+    </div>
+
+    <div class="perf" style="margin:0 -20px 26px;"></div>
+
+    <div class="anim-rise" style="margin-bottom:26px;">
+      <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--carbon);display:block;margin-bottom:10px;">Le concept</span>
+      <h2 class="display" style="font-size:19px;margin:0 0 10px;">Un cadeau. Une date. Une chance.</h2>
+      <p style="font-size:14px;line-height:1.7;color:var(--ink);margin:0;">Le commerçant choisit ce qu'il offre et fixe la date du tirage. Les clients participent en quelques secondes, gratuitement. À la date annoncée, un nom est tiré au sort — et la relation peut continuer si le gagnant le souhaite.</p>
+    </div>
+
+    <div class="anim-rise" style="margin-bottom:26px;">
+      <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--carbon);display:block;margin-bottom:10px;">Le parcours</span>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <span class="ticket-no" style="font-size:16px;color:var(--gold);min-width:28px;">01</span>
+          <div><strong style="font-family:'Fraunces',serif;font-size:14.5px;">Tu découvres un tirage</strong><p style="margin:2px 0 0;font-size:13px;color:var(--stone);">Une affiche, un QR code, chez un commerçant.</p></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <span class="ticket-no" style="font-size:16px;color:var(--gold);min-width:28px;">02</span>
+          <div><strong style="font-family:'Fraunces',serif;font-size:14.5px;">Tu tentes ta chance</strong><p style="margin:2px 0 0;font-size:13px;color:var(--stone);">Gratuitement, sans rien acheter, en 10 secondes.</p></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <span class="ticket-no" style="font-size:16px;color:var(--gold);min-width:28px;">03</span>
+          <div><strong style="font-family:'Fraunces',serif;font-size:14.5px;">Le tirage a lieu</strong><p style="margin:2px 0 0;font-size:13px;color:var(--stone);">À la date annoncée par le commerçant.</p></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <span class="ticket-no" style="font-size:16px;color:var(--gold);min-width:28px;">04</span>
+          <div><strong style="font-family:'Fraunces',serif;font-size:14.5px;">Tu gagnes, peut-être</strong><p style="margin:2px 0 0;font-size:13px;color:var(--stone);">Résultat par email et notification, immédiat.</p></div>
+        </div>
       </div>
-    </div>`;
+    </div>
+
+    <div class="perf" style="margin:0 -20px 26px;"></div>
+
+    <div class="card anim-rise" style="padding:0;overflow:hidden;margin-bottom:26px;">
+      <div style="padding:20px 20px 16px;">
+        <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--stamp);display:block;margin-bottom:8px;">Pour toi</span>
+        <h3 class="display" style="font-size:17px;margin:0 0 8px;">Une chance de gagner. Rien à acheter.</h3>
+        <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0;">Pas besoin de dépenser pour participer. Juste l'envie de tenter ta chance chez un commerce que tu fréquentes ou que tu découvres.</p>
+      </div>
+      <div class="perf" style="margin:0 -20px;"></div>
+      <div style="padding:20px 20px 16px;">
+        <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--carbon);display:block;margin-bottom:8px;">Pour ton commerce</span>
+        <h3 class="display" style="font-size:17px;margin:0 0 8px;">Proposer un cadeau, créer du lien.</h3>
+        <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 14px;">Tu choisis le lot, tu fixes la date, tes clients participent. Une expérience positive autour de ton commerce — et, avec leur accord, la possibilité de rester en contact avec eux ensuite.</p>
+        <a href="?admin=1" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Accéder à mon espace →</a>
+      </div>
+    </div>
+
+    <div class="anim-rise" style="margin-bottom:26px;">
+      <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--carbon);display:block;margin-bottom:10px;">Après le tirage</span>
+      <h2 class="display" style="font-size:19px;margin:0 0 10px;">Le tirage est terminé. La relation peut continuer.</h2>
+      <p style="font-size:14px;line-height:1.7;color:var(--ink);margin:0;">Avec leur accord, les participants peuvent rester en contact avec le commerce et recevoir ses prochaines actualités ou tirages. Le cadeau crée une première rencontre — la relation, elle, reste un choix.</p>
+    </div>
+
+    <div class="perf" style="margin:0 -20px 26px;"></div>
+
+    <div class="anim-rise" style="margin-bottom:30px;">
+      <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--stamp);display:block;margin-bottom:10px;">Philosophie</span>
+      <p style="font-size:15px;line-height:1.8;margin:0;max-width:56ch;">Un client n'est pas une donnée. Tiketo est pensé pour créer une relation positive entre les commerces et leurs clients : le client participe librement, le commerçant fait plaisir, et chacun choisit s'il souhaite continuer la relation. Simplement.</p>
+    </div>
+
+    <div style="text-align:center;margin-bottom:10px;">
+      <h3 class="display" style="font-size:20px;margin:0 0 16px;">Et si votre prochain cadeau était un ticket ?</h3>
+      <a href="javascript:history.back()" class="btn btn-secondary" style="display:inline-block;text-decoration:none;">← Retour</a>
+    </div>
+    ${legalFooterHtml()}
+  `;
 }
 
 // ================= PAGES LÉGALES (règlement / confidentialité / CGU) =================
@@ -476,7 +533,8 @@ async function renderHome(){
     <div class="anim-rise">
       <span class="stamp">🎟 carnet de tickets</span>
       <h1 class="display" style="font-size:30px;line-height:1.18;margin:16px 0 12px;">Un ticket, une chance,<br>un lien qui dure.</h1>
-      <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;line-height:1.6;margin:0 0 18px;max-width:46ch;">Le carnet de tirages au sort qui rapproche les commerces de quartier et leurs clients — un QR code à la fois.</p>
+      <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;line-height:1.6;margin:0 0 14px;max-width:46ch;">Le carnet de tirages au sort qui rapproche les commerces de quartier et leurs clients — un QR code à la fois.</p>
+      <p style="font-size:15px;line-height:1.7;margin:0 0 18px;max-width:56ch;font-weight:600;">Faire plaisir à ses clients ne devrait pas être compliqué. Un cadeau, une date, une chance — et une relation qui peut continuer, si chacun le souhaite.</p>
       <p style="font-size:15px;line-height:1.75;margin:0 0 26px;max-width:56ch;">Tiketo permet à n'importe quel commerce — restaurant, café, boutique — d'organiser des mini-tirages au sort en salle. Tu scannes, tu tentes ta chance en 10 secondes, et si tu gagnes, tu es prévenu direct par email et notification. Simple, gratuit, sans app à installer.</p>
     </div>
 
