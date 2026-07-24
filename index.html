@@ -211,29 +211,36 @@ async function safeRun(fn){
   catch(e){ showFatalError(e); }
 }
 
-if (configMissing()) {
-  $app.innerHTML = `
-    <div class="card anim-rise">
-      <span class="stamp">Configuration requise</span>
-      <h1 class="display" style="font-size:24px;margin:12px 0 8px;">Il manque ta configuration Firebase</h1>
-      <p style="color:var(--stone);font-size:14px;">
-        Ouvre <span class="mono">index.html</span>, trouve le bloc <span class="mono">firebaseConfig</span>
-        tout en haut du script, et remplace les valeurs "REMPLACE_MOI" par celles de ton projet Firebase
-        (Console Firebase → Paramètres du projet → Tes applications → SDK config). Voir le README.
-      </p>
-    </div>`;
-} else if (params.get("about") === "1") {
-  safeRun(renderAbout);
-} else if (params.get("winners") === "1") {
-  safeRun(renderWinnersSearch);
-} else if (restoId) {
-  safeRun(() => renderPublic(restoId));
-} else if (params.get("admin") === "1") {
-  safeRun(renderAdminGate);
-} else if (params.get("legal")) {
-  safeRun(() => renderLegal(params.get("legal")));
-} else {
-  safeRun(renderHome);
+// ---------- DÉMARRAGE ----------
+// Regroupé dans une fonction et appelé en tout dernier (voir bas de fichier),
+// une fois que toutes les fonctions ET constantes du script sont déclarées.
+// Ça évite les bugs "Cannot access ... before initialization" si une route
+// est ajoutée ici avant que sa constante ne soit définie plus bas.
+function init(){
+  if (configMissing()) {
+    $app.innerHTML = `
+      <div class="card anim-rise">
+        <span class="stamp">Configuration requise</span>
+        <h1 class="display" style="font-size:24px;margin:12px 0 8px;">Il manque ta configuration Firebase</h1>
+        <p style="color:var(--stone);font-size:14px;">
+          Ouvre <span class="mono">index.html</span>, trouve le bloc <span class="mono">firebaseConfig</span>
+          tout en haut du script, et remplace les valeurs "REMPLACE_MOI" par celles de ton projet Firebase
+          (Console Firebase → Paramètres du projet → Tes applications → SDK config). Voir le README.
+        </p>
+      </div>`;
+  } else if (params.get("about") === "1") {
+    safeRun(renderAbout);
+  } else if (params.get("winners") === "1") {
+    safeRun(renderWinnersSearch);
+  } else if (restoId) {
+    safeRun(() => renderPublic(restoId));
+  } else if (params.get("admin") === "1") {
+    safeRun(renderAdminGate);
+  } else if (params.get("legal")) {
+    safeRun(() => renderLegal(params.get("legal")));
+  } else {
+    safeRun(renderHome);
+  }
 }
 
 // ================= PROTECTION ADMIN (Firebase Authentication) =================
@@ -1744,6 +1751,9 @@ async function renderDetailInline(id, data, container){
     }, 90);
   };
 }
+
+// Tout le script est maintenant chargé (fonctions + constantes) : on peut démarrer.
+init();
 </script>
 </body>
 </html>
