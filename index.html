@@ -534,8 +534,23 @@ async function renderHome(){
       <span class="stamp">🎟 carnet de tickets</span>
       <h1 class="display" style="font-size:30px;line-height:1.18;margin:16px 0 12px;">Un ticket, une chance,<br>un lien qui dure.</h1>
       <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;line-height:1.6;margin:0 0 14px;max-width:46ch;">Le carnet de tirages au sort qui rapproche les commerces de quartier et leurs clients — un QR code à la fois.</p>
-      <p style="font-size:15px;line-height:1.7;margin:0 0 18px;max-width:56ch;font-weight:600;">Faire plaisir à ses clients ne devrait pas être compliqué. Un cadeau, une date, une chance — et une relation qui peut continuer, si chacun le souhaite.</p>
-      <p style="font-size:15px;line-height:1.75;margin:0 0 26px;max-width:56ch;">Tiketo permet à n'importe quel commerce — restaurant, café, boutique — d'organiser des mini-tirages au sort en salle. Tu scannes, tu tentes ta chance en 10 secondes, et si tu gagnes, tu es prévenu direct par email et notification. Simple, gratuit, sans app à installer.</p>
+      <p style="font-size:15px;line-height:1.7;margin:0 0 22px;max-width:56ch;font-weight:600;">Faire plaisir à ses clients ne devrait pas être compliqué. Un cadeau, une date, une chance — et une relation qui peut continuer, si chacun le souhaite.</p>
+    </div>
+
+    <div class="anim-rise" style="display:flex;flex-direction:column;gap:12px;margin-bottom:26px;">
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="font-size:17px;line-height:1;">🎁</span>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:var(--ink);"><strong style="font-family:'Fraunces',serif;">Gratuit, sans rien acheter.</strong> Le commerçant choisit un cadeau et une date, tu tentes ta chance en 10 secondes.</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="font-size:17px;line-height:1;">🤝</span>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:var(--ink);"><strong style="font-family:'Fraunces',serif;">Le tirage terminé, la relation peut continuer.</strong> Avec ton accord, tu peux rester en contact avec le commerce. Rien n'est imposé, rien n'est revendu.</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="font-size:17px;line-height:1;">🏪</span>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:var(--ink);"><strong style="font-family:'Fraunces',serif;">Pensé pour le commerce de quartier.</strong> Zéro app à installer, ni pour toi ni pour tes clients.</p>
+      </div>
+      <a href="?about=1" style="font-size:12px;font-family:'IBM Plex Mono',monospace;font-weight:600;text-decoration:underline;text-underline-offset:3px;color:var(--stamp);margin-top:4px;">Toute la philosophie Tiketo →</a>
     </div>
 
     <div class="perf" style="margin:0 -20px 26px;"></div>
@@ -547,8 +562,13 @@ async function renderHome(){
       </div>
       <div style="padding:22px 20px 14px;">
         <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--carbon);display:block;margin-bottom:8px;">Talon commerçant</span>
-        <h3 class="display" style="font-size:19px;margin:0 0 10px;">Tu as un commerce ?</h3>
-        <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 14px;">Affiche un QR code, tes clients tentent de gagner un lot de ton choix en un instant — et toi, tu construis discrètement ta base de clients. Tu tires le gagnant en un clic, et surtout : tu peux ensuite relancer tous tes clients quand tu veux, par notification push, pour annoncer une promo, un événement ou un nouveau tirage. Zéro app à installer, pour toi comme pour eux.</p>
+        <h3 class="display" style="font-size:19px;margin:0 0 10px;">Adopte Tiketo dans ta boutique.</h3>
+        <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 12px;">Affiche un QR code, tes clients tentent de gagner un lot de ton choix en un instant — et toi, tu construis discrètement ta base de clients.</p>
+        <ul style="margin:0 0 14px;padding:0 0 0 18px;font-size:13px;line-height:1.9;color:var(--ink);">
+          <li>Tu choisis le cadeau et la date, tu tires le gagnant en un clic</li>
+          <li>Tu relances tes clients quand tu veux : promo, événement, nouveau tirage</li>
+          <li>Zéro app à installer, pour toi comme pour eux</li>
+        </ul>
         <a href="?admin=1" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Accéder à mon espace →</a>
 
         <div style="margin-top:14px;border:1px solid var(--line);border-radius:6px;overflow:hidden;">
@@ -573,9 +593,6 @@ async function renderHome(){
       <div id="home-winners" class="winners-scroll"><p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Chargement…</p></div>
     </div>
 
-    <div style="text-align:center;margin-top:34px;">
-      <a href="?about=1" style="font-size:11px;color:var(--stone);font-family:'IBM Plex Mono',monospace;text-decoration:underline;text-underline-offset:3px;">C'est quoi Tiketo, en détail ?</a>
-    </div>
     ${legalFooterHtml()}
   `;
 
