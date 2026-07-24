@@ -624,12 +624,12 @@ async function renderHome(){
   $app.innerHTML = `
     <div class="anim-rise" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;">
       <img src="logo.png" alt="Tiketo" style="height:65px;">
-      <a href="?admin=1" class="btn btn-secondary" style="font-size:12px;padding:8px 14px;text-decoration:none;">Se connecter</a>
+      <a href="?admin=1" class="btn btn-secondary" style="font-size:12px;padding:8px 14px;text-decoration:none;">Espace commerçant</a>
     </div>
 
     <!-- 1. HERO — le concept compris en 5 secondes -->
     <div class="anim-rise">
-      <span class="stamp">🎟 carnet de tickets</span>
+      <span class="stamp"><span class="icon-inline" style="margin:0 5px 0 0;width:11px;height:11px;color:var(--stamp);">${icon("ticket")}</span>carnet de tickets</span>
       <h1 class="display" style="font-size:30px;line-height:1.18;margin:16px 0 12px;">Un ticket. Une chance.<br>Un cadeau à gagner.</h1>
       <p style="color:var(--stone);font-size:14px;font-family:'IBM Plex Mono',monospace;line-height:1.6;margin:0 0 22px;max-width:46ch;">Tiketo permet aux commerces de proposer des tirages au sort gratuits. Un cadeau, une date, une chance de gagner — simplement.</p>
     </div>
