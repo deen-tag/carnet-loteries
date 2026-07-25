@@ -1444,32 +1444,28 @@ function openAccountModal(user){
   const bg = document.createElement("div");
   bg.className = "modal-bg admin-shell";
   bg.innerHTML = `
-    <div class="card" style="max-width:380px;width:100%;">
+    <div class="card" style="max-width:400px;width:100%;">
       <span class="stamp">Mon compte</span>
-      <h3 class="display" style="margin:12px 0 4px;">Réglages du compte</h3>
-      <p style="font-size:12px;color:var(--stone);margin:0 0 16px;font-family:'IBM Plex Mono',monospace;">${esc(user.email)}</p>
+      <h3 class="display" style="margin:10px 0 3px;">Réglages du compte</h3>
+      <p style="font-size:12px;color:var(--stone);margin:0 0 22px;font-family:'IBM Plex Mono',monospace;">${esc(user.email)}</p>
 
-      <label class="field">MOT DE PASSE ACTUEL (requis pour tout changement)</label>
-      <input type="text" id="a-current-pass" style="margin-bottom:18px;">
+      <p class="section-eyebrow stamp-tone" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;margin:0 0 12px;font-family:'IBM Plex Mono',monospace;">Informations</p>
+      <label class="field">ADRESSE EMAIL</label>
+      <input type="text" id="a-email" placeholder="nouveau@email.com" value="${esc(user.email)}" style="margin-bottom:14px;">
+      <label class="field">PSEUDO</label>
+      <input type="text" id="a-pseudo" placeholder="pizzabella" style="margin-bottom:22px;">
 
-      <div class="perf" style="margin:0 -24px 18px;"></div>
-
-      <label class="field">NOUVEAU PSEUDO (optionnel)</label>
-      <input type="text" id="a-pseudo" placeholder="pizzabella" style="margin-bottom:8px;">
-      <button class="btn btn-secondary a-save-pseudo" style="width:100%;margin-bottom:6px;">Changer le pseudo</button>
-      <p class="a-pseudo-status" style="font-size:12px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
-
-      <label class="field">NOUVEL EMAIL (optionnel)</label>
-      <input type="text" id="a-email" placeholder="nouveau@email.com" style="margin-bottom:8px;">
-      <button class="btn btn-secondary a-save-email" style="width:100%;margin-bottom:6px;">Changer l'email</button>
-      <p class="a-email-status" style="font-size:12px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
-
+      <p class="section-eyebrow stamp-tone" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;margin:0 0 12px;font-family:'IBM Plex Mono',monospace;">Sécurité</p>
       <label class="field">NOUVEAU MOT DE PASSE (optionnel, 6 car. min)</label>
-      <input type="text" id="a-newpass" style="margin-bottom:8px;">
-      <button class="btn btn-secondary a-save-pass" style="width:100%;margin-bottom:6px;">Changer le mot de passe</button>
-      <p class="a-pass-status" style="font-size:12px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
+      <input type="text" id="a-newpass" style="margin-bottom:14px;">
+      <label class="field">MOT DE PASSE ACTUEL (requis pour enregistrer)</label>
+      <input type="text" id="a-current-pass" style="margin-bottom:8px;">
+      <p class="a-status" style="font-size:12px;min-height:16px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
 
-      <button class="btn btn-secondary a-close" style="width:100%;">Fermer</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary a-close" style="flex:1;">Fermer</button>
+        <button class="btn btn-primary a-save" style="flex:1;">Enregistrer les modifications</button>
+      </div>
     </div>`;
   document.body.appendChild(bg);
   bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
@@ -1477,59 +1473,78 @@ function openAccountModal(user){
 
   const currentPassEl = document.getElementById("a-current-pass");
   currentPassEl.type = "password";
+  const newPassEl = document.getElementById("a-newpass");
+  newPassEl.type = "password";
+  document.getElementById("a-pseudo").value = "";
 
-  async function reauth(){
-    if (!currentPassEl.value) throw new Error("Renseigne ton mot de passe actuel ci-dessus.");
-    const cred = EmailAuthProvider.credential(user.email, currentPassEl.value);
-    await reauthenticateWithCredential(user, cred);
-  }
+  const saveBtn = bg.querySelector(".a-save");
+  const statusEl = bg.querySelector(".a-status");
 
-  bg.querySelector(".a-save-pseudo").onclick = async () => {
-    const statusEl = bg.querySelector(".a-pseudo-status");
-    const newPseudo = document.getElementById("a-pseudo").value.trim().toLowerCase();
-    if (!newPseudo) { statusEl.textContent = "Tape un pseudo d'abord."; statusEl.style.color = "var(--stamp)"; return; }
-    statusEl.textContent = "…"; statusEl.style.color = "var(--stone)";
-    try {
-      await reauth();
-      // nettoie les anciens pseudos de ce compte : sinon ils restent actifs
-      // pour toujours et plusieurs pseudos finissent par pointer vers le
-      // même compte sans que personne ne le sache.
-      const myEmail = user.email.toLowerCase();
-      const oldSnap = await getDocs(query(collection(db,"usernames"), where("email","==",myEmail)));
-      await Promise.all(oldSnap.docs.filter(d => d.id !== newPseudo).map(d => deleteDoc(doc(db,"usernames",d.id))));
-      await setDoc(doc(db,"usernames",newPseudo), { email: myEmail });
-      statusEl.textContent = "Pseudo mis à jour"; statusEl.style.color = "var(--stamp)";
-    } catch(e) {
-      statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
-    }
-  };
-
-  bg.querySelector(".a-save-email").onclick = async () => {
-    const statusEl = bg.querySelector(".a-email-status");
+  saveBtn.onclick = async () => {
     const newEmail = document.getElementById("a-email").value.trim().toLowerCase();
-    if (!newEmail || !newEmail.includes("@")) { statusEl.textContent = "Email invalide."; statusEl.style.color = "var(--stamp)"; return; }
-    statusEl.textContent = "…"; statusEl.style.color = "var(--stone)";
-    try {
-      await reauth();
-      await verifyBeforeUpdateEmail(user, newEmail);
-      statusEl.textContent = "Email de confirmation envoyé à " + newEmail + " — clique le lien reçu pour valider. Ton accès actuel reste actif en attendant.";
-      statusEl.style.color = "var(--gold)";
-    } catch(e) {
-      statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
-    }
-  };
+    const newPseudo = document.getElementById("a-pseudo").value.trim().toLowerCase();
+    const newPass = newPassEl.value;
 
-  bg.querySelector(".a-save-pass").onclick = async () => {
-    const statusEl = bg.querySelector(".a-pass-status");
-    const newPass = document.getElementById("a-newpass").value;
-    if (!newPass || newPass.length < 6) { statusEl.textContent = "6 caractères minimum."; statusEl.style.color = "var(--stamp)"; return; }
-    statusEl.textContent = "…"; statusEl.style.color = "var(--stone)";
+    if (newPass && newPass.length < 6) {
+      statusEl.textContent = "Le nouveau mot de passe doit faire 6 caractères minimum.";
+      statusEl.style.color = "var(--stamp)";
+      return;
+    }
+    if (newEmail && !newEmail.includes("@")) {
+      statusEl.textContent = "Email invalide.";
+      statusEl.style.color = "var(--stamp)";
+      return;
+    }
+    if (!currentPassEl.value) {
+      statusEl.textContent = "Renseigne ton mot de passe actuel pour confirmer.";
+      statusEl.style.color = "var(--stamp)";
+      return;
+    }
+
+    statusEl.textContent = "Enregistrement…";
+    statusEl.style.color = "var(--stone)";
+    saveBtn.disabled = true;
+
     try {
-      await reauth();
-      await updatePassword(user, newPass);
-      statusEl.textContent = "Mot de passe changé"; statusEl.style.color = "var(--stamp)";
+      const cred = EmailAuthProvider.credential(user.email, currentPassEl.value);
+      await reauthenticateWithCredential(user, cred);
+
+      let emailPending = false;
+
+      if (newPseudo) {
+        // nettoie les anciens pseudos de ce compte : sinon ils restent actifs
+        // pour toujours et plusieurs pseudos finissent par pointer vers le
+        // même compte sans que personne ne le sache.
+        const myEmail = user.email.toLowerCase();
+        const oldSnap = await getDocs(query(collection(db,"usernames"), where("email","==",myEmail)));
+        await Promise.all(oldSnap.docs.filter(d => d.id !== newPseudo).map(d => deleteDoc(doc(db,"usernames",d.id))));
+        await setDoc(doc(db,"usernames",newPseudo), { email: myEmail });
+      }
+
+      if (newEmail && newEmail !== user.email.toLowerCase()) {
+        await verifyBeforeUpdateEmail(user, newEmail);
+        emailPending = true;
+      }
+
+      if (newPass) {
+        await updatePassword(user, newPass);
+      }
+
+      if (emailPending) {
+        statusEl.textContent = "Modifications enregistrées. Un email de confirmation a été envoyé à " + newEmail + " — clique le lien reçu pour valider. Ton accès actuel reste actif en attendant.";
+        statusEl.style.color = "var(--gold)";
+      } else {
+        statusEl.textContent = "Modifications enregistrées";
+        statusEl.style.color = "var(--stamp)";
+        toast("Modifications enregistrées");
+      }
+      currentPassEl.value = "";
+      newPassEl.value = "";
     } catch(e) {
-      statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
+      statusEl.textContent = "Erreur : " + (e?.message || String(e));
+      statusEl.style.color = "var(--stamp)";
+    } finally {
+      saveBtn.disabled = false;
     }
   };
 }
