@@ -29,6 +29,7 @@
     --gold:#B98A1D;         /* foil gold — prize / winner */
     --stone:#857A63;        /* muted stone */
     --line: rgba(32,41,31,.16);
+    --admin-bg:#F7F7F5;     /* fond neutre du dashboard admin (SaaS, pas carnet) */
   }
   *{box-sizing:border-box;}
   @media (prefers-reduced-motion: reduce){
@@ -168,6 +169,39 @@
 
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.3);}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* =====================================================================
+     ADMIN DASHBOARD — dashboard SaaS moderne, scope isolé via .admin-shell
+     pour ne jamais toucher au style "carnet papier" de la page publique.
+     ===================================================================== */
+  .admin-shell .card{border-radius:12px;box-shadow:0 1px 2px rgba(32,41,31,.05), 0 4px 14px -10px rgba(32,41,31,.18);}
+  .admin-shell .resto-card{border-radius:12px;}
+  .admin-shell .resto-card:hover{box-shadow:0 1px 2px rgba(32,41,31,.06), 0 10px 22px -12px rgba(32,41,31,.24);}
+  .admin-shell input[type=text],.admin-shell input[type=email],.admin-shell input[type=date],.admin-shell textarea{box-shadow:none;border-color:rgba(32,41,31,.14);border-radius:8px;}
+  .admin-shell input[type=text]:focus,.admin-shell input[type=email]:focus,.admin-shell input[type=date]:focus,.admin-shell textarea:focus{box-shadow:0 0 0 3px rgba(168,52,31,.10);}
+  .admin-shell .btn{border-radius:8px;}
+  .admin-shell .btn-primary{box-shadow:none;}
+  .admin-shell .btn-primary:hover{box-shadow:none;transform:none;filter:brightness(1.06);}
+  .admin-shell .btn-secondary{border-color:rgba(32,41,31,.2);}
+  /* eyebrow de modale : même info que .stamp mais à plat, sans tampon ni rotation */
+  .admin-shell .stamp{transform:none;border:none;background:transparent;color:var(--stone);padding:0;font-size:10.5px;letter-spacing:.12em;}
+  .admin-shell .stamp::before{display:none;}
+  .admin-shell .stamp-gold{color:var(--gold);}
+  .admin-shell label.field{margin-bottom:6px;}
+  .admin-shell .field-row{margin-bottom:16px;}
+  /* barre de stats compacte (remplace les 4 grosses cartes empilées) */
+  .admin-shell .stat-bar{display:flex;background:var(--surface);border-radius:12px;box-shadow:0 1px 2px rgba(32,41,31,.05), 0 4px 14px -10px rgba(32,41,31,.18);overflow:hidden;flex-wrap:wrap;}
+  .admin-shell .stat-chip{flex:1 1 auto;min-width:88px;padding:14px 16px;text-align:center;border-right:1px solid var(--line);}
+  .admin-shell .stat-chip:last-child{border-right:none;}
+  .admin-shell .stat-value{font-family:'Fraunces',serif;font-weight:600;font-size:22px;color:var(--stamp);line-height:1;}
+  .admin-shell .stat-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.09em;color:var(--stone);text-transform:uppercase;margin-top:4px;display:block;}
+  /* badge statut discret (remplace la grosse pastille) */
+  .admin-shell .status-dot{display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;white-space:nowrap;}
+  .admin-shell .status-dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;}
+  .admin-shell .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;flex-shrink:0;}
+  .admin-shell .icon-btn svg{width:15px;height:15px;}
+  .admin-shell .btn svg{width:14px;height:14px;flex-shrink:0;}
+  .admin-shell .btn-icon-label{display:inline-flex;align-items:center;justify-content:center;gap:7px;}
 </style>
 </head>
 <body>
@@ -620,6 +654,13 @@ function icon(name){
     trophy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v4a4 4 0 0 1-8 0V4z"/><path d="M8 5H5a3 3 0 0 0 3 4"/><path d="M16 5h3a3 3 0 0 1-3 4"/><path d="M12 12v3"/><path d="M9 19h6"/><path d="M10 15h4l1 4H9l1-4z"/></svg>`,
     link: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 7 8.5-7"/></svg>`,
     ticket: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.2a1.4 1.4 0 0 0 0 2.6V13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.2a1.4 1.4 0 0 0 0-2.6z"/><path d="M9 6v10" stroke-dasharray="2 2.2"/></svg>`,
+    gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V19a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.04-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 13a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 6.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 2.6a1.7 1.7 0 0 0 1.04-1.56V1a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 2.6a1.7 1.7 0 0 0 1.87.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 6.9c.1.6.5 1.1 1.04 1.35"/></svg>`,
+    trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/></svg>`,
+    refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/></svg>`,
+    search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>`,
+    clipboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 4H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"/></svg>`,
+    download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>`,
+    megaphone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a2 2 0 0 0 2 2h1l3 5V4l-3 5H5a2 2 0 0 0-2 2z"/><path d="M13 8.5a4 4 0 0 1 0 7"/><path d="M16.5 6a8 8 0 0 1 0 12"/></svg>`,
   };
   return ICONS[name] || "";
 }
@@ -1171,12 +1212,13 @@ let currentUser = null;
 let currentIsSuperAdmin = false;
 
 async function renderAdmin(user){
-  document.body.style.background = "";
+  document.body.style.background = "var(--admin-bg)";
   $app.style.display = ""; $app.style.alignItems = ""; $app.style.justifyContent = ""; $app.style.minHeight = "";
   currentUser = user;
   currentIsSuperAdmin = (user.email || "").toLowerCase() === SUPER_ADMIN_EMAIL;
   const isSuperAdmin = currentIsSuperAdmin;
   $app.innerHTML = `
+    <div class="admin-shell">
     <div class="anim-rise" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap;gap:12px;">
       <div>
         <img src="logo.png" alt="Tiketo" style="height:110px;margin-bottom:10px;">
@@ -1185,17 +1227,18 @@ async function renderAdmin(user){
         </p>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-start;">
-        <button class="btn btn-secondary" id="btn-account" style="font-size:12px;padding:8px 10px;">⚙️ Mon compte</button>
+        <button class="btn btn-secondary btn-icon-label" id="btn-account" style="font-size:12px;padding:8px 10px;">${icon("gear")}Mon compte</button>
         <button class="btn btn-secondary" id="btn-logout" style="font-size:12px;padding:8px 10px;">Déconnexion</button>
         ${isSuperAdmin ? `<button class="btn btn-primary" id="btn-add">+ Nouveau commerce</button>` : ""}
       </div>
     </div>
-    <div id="stats-bar" class="anim-rise" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;"></div>
+    <div id="stats-bar" class="anim-rise" style="margin-bottom:20px;"></div>
     <div id="search-wrap" class="anim-rise hidden" style="margin-bottom:16px;">
       <input type="text" id="search-input" placeholder="Rechercher un commerce…">
     </div>
     <div id="list" class="grid"><p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;">Chargement…</p></div>
     <div id="detail"></div>
+    </div>
   `;
   const addBtn = document.getElementById("btn-add");
   if (addBtn) addBtn.onclick = openAddModal;
@@ -1205,9 +1248,9 @@ async function renderAdmin(user){
   await loadList(user, isSuperAdmin);
 }
 function statChip(label, value){
-  return `<div class="card" style="padding:12px 18px;flex:1;min-width:120px;text-align:center;">
-    <div class="ticket-no" style="font-size:26px;color:var(--stamp);">${value}</div>
-    <div class="mono" style="font-size:10px;letter-spacing:.1em;color:var(--stone);text-transform:uppercase;margin-top:2px;">${label}</div>
+  return `<div class="stat-chip">
+    <div class="stat-value">${value}</div>
+    <span class="stat-label">${label}</span>
   </div>`;
 }
 
@@ -1278,12 +1321,13 @@ async function loadList(user, isSuperAdmin){
     } catch { /* pas grave si le doc/règle n'existe pas encore */ }
   }
 
-  document.getElementById("stats-bar").innerHTML =
+  document.getElementById("stats-bar").innerHTML = `<div class="stat-bar">` +
     statChip(isSuperAdmin ? "Commerces" : "Ton commerce", allRestos.length) +
     statChip("Clients", allRestos.reduce((s,{id}) => s + (allClientCounts[id]||0), 0)) +
     statChip("Tirages actifs", Object.values(allActiveDraws).filter(Boolean).length) +
     statChip("Participations", closedParticipations + activeParticipations) +
-    lifetimeChip;
+    lifetimeChip +
+    `</div>`;
   document.getElementById("search-wrap").classList.toggle("hidden", allRestos.length < 5);
 
   renderList("");
@@ -1317,33 +1361,33 @@ function renderList(filterText){
     // "à clôturer" seulement si on a une vraie date ISO fiable (nouveaux
     // tirages) — jamais déduit d'un texte libre, pour éviter les faux positifs
     const isOverdue = !!(draw && draw.drawDate && draw.drawDate < todayISO());
-    const statusBadge = !draw
-      ? `<span class="mono" style="font-size:10px;color:var(--stone);display:inline-flex;align-items:center;gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--stone);display:inline-block;"></span>Aucun tirage</span>`
+    const statusDot = !draw
+      ? `<span class="status-dot" style="color:var(--stone);">Aucun tirage</span>`
       : isOverdue
-      ? `<span class="mono" style="font-size:10px;color:#a8631c;display:inline-flex;align-items:center;gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#c97d1f;display:inline-block;"></span>À clôturer</span>`
-      : `<span class="mono" style="font-size:10px;color:#3f7a3f;display:inline-flex;align-items:center;gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#3f7a3f;display:inline-block;"></span>Tirage actif</span>`;
-    const drawInfo = draw
-      ? `<div style="margin-top:8px;font-size:12px;color:var(--ink);font-family:'IBM Plex Mono',monospace;line-height:1.6;">
-           <span style="display:flex;align-items:center;"><span class="icon-inline" style="margin:0 6px 0 0;width:12px;height:12px;">${icon("gift")}</span>${esc(draw.prize||"—")}</span>
-           <span style="display:flex;align-items:center;color:var(--stone);"><span class="icon-inline" style="margin:0 6px 0 0;width:12px;height:12px;">${icon("calendar")}</span>${draw.date ? esc(draw.date) : "date à définir"}${draw.participantCount != null ? ` · ${draw.participantCount} participant(s)` : ""}</span>
-         </div>`
-      : "";
+      ? `<span class="status-dot" style="color:#a8631c;">À clôturer</span>`
+      : `<span class="status-dot" style="color:#3f7a3f;">Tirage actif</span>`;
+    const metaParts = [`${allClientCounts[id]||0} client(s)`];
+    if (draw) {
+      metaParts.push(esc(draw.prize||"—"));
+      metaParts.push(draw.date ? esc(draw.date) : "date à définir");
+      if (draw.participantCount != null) metaParts.push(`${draw.participantCount} participant(s)`);
+    }
     wrap.innerHTML = `
-      <div class="resto-header" style="display:flex;justify-content:space-between;align-items:center;padding:18px 20px;cursor:pointer;gap:14px;">
-        <div style="display:flex;align-items:center;gap:16px;min-width:0;flex:1;">
-          <div class="ticket-no" style="font-size:26px;color:var(--carbon);flex-shrink:0;">${esc(ticketNo)}</div>
-          <div style="min-width:0;flex:1;">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span class="stamp">${allClientCounts[id]||0} client(s)</span>
-              ${statusBadge}
-            </div>
-            <h3 class="display" style="font-size:19px;margin:8px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(data.name)}</h3>
-            ${drawInfo}
+      <div class="resto-header" style="display:flex;justify-content:space-between;align-items:center;padding:20px 22px;cursor:pointer;gap:14px;">
+        <div style="min-width:0;flex:1;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h3 class="display" style="font-size:18px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(data.name)}</h3>
+            <span class="mono" style="font-size:10.5px;color:var(--stone);opacity:.7;">${esc(ticketNo)}</span>
+          </div>
+          <div class="mono" style="font-size:12px;color:var(--stone);margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            ${statusDot}
+            <span style="opacity:.5;">·</span>
+            <span>${metaParts.join(" · ")}</span>
           </div>
         </div>
-        <button class="btn btn-secondary del-btn ${currentIsSuperAdmin ? "" : "hidden"}" style="padding:8px 12px;flex-shrink:0;">🗑️</button>
+        <button class="btn btn-secondary icon-btn del-btn ${currentIsSuperAdmin ? "" : "hidden"}" aria-label="Supprimer" title="Supprimer">${icon("trash")}</button>
       </div>
-      <div class="resto-body" style="display:none;padding:0 20px 20px;"></div>
+      <div class="resto-body" style="display:none;padding:0 22px 22px;"></div>
     `;
     const header = wrap.querySelector(".resto-header");
     const body = wrap.querySelector(".resto-body");
@@ -1365,7 +1409,7 @@ function renderList(filterText){
     delBtn.onclick = async (ev) => {
       ev.stopPropagation();
       if (!confirm(`Supprimer "${data.name}" ? Cette action est définitive et supprime aussi tous ses tirages et clients.`)) return;
-      delBtn.disabled = true; delBtn.textContent = "…";
+      delBtn.disabled = true; delBtn.innerHTML = "…";
       try {
         // nettoyage en cascade : sinon les tirages/participants/clients
         // restent orphelins dans la base pour toujours
@@ -1387,7 +1431,7 @@ function renderList(filterText){
         await loadList();
       } catch(err) {
         alert("Erreur suppression : " + (err?.message || String(err)));
-        delBtn.disabled = false; delBtn.textContent = "🗑️";
+        delBtn.disabled = false; delBtn.innerHTML = icon("trash");
       }
     };
 
@@ -1397,7 +1441,7 @@ function renderList(filterText){
 
 function openAccountModal(user){
   const bg = document.createElement("div");
-  bg.className = "modal-bg";
+  bg.className = "modal-bg admin-shell";
   bg.innerHTML = `
     <div class="card" style="max-width:380px;width:100%;">
       <span class="stamp">Mon compte</span>
@@ -1424,7 +1468,7 @@ function openAccountModal(user){
       <button class="btn btn-secondary a-save-pass" style="width:100%;margin-bottom:6px;">Changer le mot de passe</button>
       <p class="a-pass-status" style="font-size:12px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
 
-      <button class="btn btn-primary a-close" style="width:100%;">Fermer</button>
+      <button class="btn btn-secondary a-close" style="width:100%;">Fermer</button>
     </div>`;
   document.body.appendChild(bg);
   bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
@@ -1447,7 +1491,7 @@ function openAccountModal(user){
     try {
       await reauth();
       await setDoc(doc(db,"usernames",newPseudo), { email: user.email.toLowerCase() });
-      statusEl.textContent = "Pseudo mis à jour ✅"; statusEl.style.color = "var(--stamp)";
+      statusEl.textContent = "Pseudo mis à jour"; statusEl.style.color = "var(--stamp)";
     } catch(e) {
       statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
     }
@@ -1476,7 +1520,7 @@ function openAccountModal(user){
     try {
       await reauth();
       await updatePassword(user, newPass);
-      statusEl.textContent = "Mot de passe changé ✅"; statusEl.style.color = "var(--stamp)";
+      statusEl.textContent = "Mot de passe changé"; statusEl.style.color = "var(--stamp)";
     } catch(e) {
       statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
     }
@@ -1485,7 +1529,7 @@ function openAccountModal(user){
 
 function openAddModal(){
   const bg = document.createElement("div");
-  bg.className = "modal-bg";
+  bg.className = "modal-bg admin-shell";
   bg.innerHTML = `
     <div class="card" style="max-width:380px;width:100%;">
       <span class="stamp">Nouveau ticket</span>
@@ -1538,7 +1582,7 @@ function openAddModal(){
 
 function openNewDrawModal(id, restoName, oldDrawId, onDone){
   const bg = document.createElement("div");
-  bg.className = "modal-bg";
+  bg.className = "modal-bg admin-shell";
   bg.innerHTML = `
     <div class="card" style="max-width:380px;width:100%;">
       <span class="stamp">Nouveau ticket</span>
@@ -1590,7 +1634,7 @@ function openNewDrawModal(id, restoName, oldDrawId, onDone){
 
 function openVerifyWinnerModal(restoId){
   const bg = document.createElement("div");
-  bg.className = "modal-bg";
+  bg.className = "modal-bg admin-shell";
   bg.innerHTML = `
     <div class="card" style="max-width:380px;width:100%;">
       <span class="stamp stamp-gold">Vérification</span>
@@ -1633,7 +1677,7 @@ function openVerifyWinnerModal(restoId){
       if (!drawId) {
         const snap = await getDocs(query(collection(db,"draws"), where("restaurantId","==",restoId)));
         const match = snap.docs.find(d => d.data().winner && d.data().winner.code === code);
-        if (!match){ resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">❌ Code invalide pour ce commerce.</p>`; return; }
+        if (!match){ resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">Code invalide pour ce commerce.</p>`; return; }
         drawId = match.id;
       }
       const r = await fetch("/api/verify-winner", {
@@ -1642,17 +1686,17 @@ function openVerifyWinnerModal(restoId){
       });
       const out = await r.json();
       if (out.ok){
-        resultEl.innerHTML = `<div class="winner-reveal" style="text-align:center;padding:16px 0;background:var(--paper-deep);border-radius:6px;">
-          <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">✅ GAGNANT CONFIRMÉ</p>
+        resultEl.innerHTML = `<div class="winner-reveal" style="text-align:center;padding:16px 0;background:rgba(185,138,29,.08);border-radius:10px;">
+          <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">GAGNANT CONFIRMÉ</p>
           <p class="display" style="font-size:22px;color:var(--stamp);margin:6px 0;animation:stampIn .5s ease;">${esc(out.prenom||"")}</p>
           ${out.prize ? `<p class="mono" style="font-size:12px;color:var(--stone);margin:0;">${esc(out.prize)}</p>` : ""}
         </div>`;
         confettiBurst(resultEl.querySelector(".winner-reveal"));
         if (scanner) { try{ scanner.pause(true); }catch{} }
       } else if (out.error === "already_claimed") {
-        resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">⚠️ Déjà réclamé${out.prenom ? " par " + esc(out.prenom) : ""}.</p>`;
+        resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">Déjà réclamé${out.prenom ? " par " + esc(out.prenom) : ""}.</p>`;
       } else {
-        resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">❌ ${esc(out.message || out.error || "Code invalide.")}</p>`;
+        resultEl.innerHTML = `<p style="color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:13px;margin:0;">${esc(out.message || out.error || "Code invalide.")}</p>`;
       }
     }catch(e){
       resultEl.innerHTML = `<p class="err" style="margin:0;">Erreur : ${esc(e?.message || String(e))}</p>`;
@@ -1713,7 +1757,7 @@ async function renderDetailInline(id, data, container){
     <div style="display:flex;gap:20px;flex-wrap:wrap;">
       <div style="flex-shrink:0;">
         <img src="${qrUrl}" width="140" height="140" style="border-radius:6px;border:1px solid var(--line);display:block;">
-        <button class="btn btn-ghost dl-qr-btn mono" style="padding:8px 0;font-size:11px;">⬇ Télécharger le QR</button>
+        <button class="btn btn-ghost dl-qr-btn mono btn-icon-label" style="padding:8px 0;font-size:11px;">${icon("download")}Télécharger le QR</button>
       </div>
       <div style="flex:1;min-width:200px;">
         <label class="field">LIEN À PARTAGER</label>
@@ -1736,20 +1780,20 @@ async function renderDetailInline(id, data, container){
           ? `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">${esc(openDraw.prize)}${openDraw.date ? " · " + esc(openDraw.date) : ""}</p>`
           : `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">Aucun tirage actif.</p>`}
       </div>
-      <button class="btn btn-secondary new-draw-btn" style="font-size:12px;padding:8px 10px;">🔄 Nouveau tirage</button>
+      <button class="btn btn-secondary new-draw-btn btn-icon-label" style="font-size:12px;padding:8px 10px;">${icon("refresh")}Nouveau tirage</button>
     </div>
 
     ${openDraw ? `
     ${!openDraw.winner ? `
     <div style="margin-top:16px;display:flex;justify-content:flex-end;">
-      <button class="btn btn-primary draw-btn">🎁 Tirer un gagnant <span class="live-draw-count"></span></button>
+      <button class="btn btn-primary draw-btn btn-icon-label">${icon("gift")}Tirer un gagnant <span class="live-draw-count"></span></button>
     </div>
     <p style="font-size:11px;color:var(--stone);margin:4px 0 0;font-family:'IBM Plex Mono',monospace;text-align:right;">Inscrits à CE tirage uniquement</p>
     ` : ""}
     <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">
       ${openDraw.winner
-        ? `<div class="winner-reveal" style="text-align:center;padding:18px 0;background:var(--paper-deep);border-radius:6px;">
-             <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">🎉 GAGNANT 🎉</p>
+        ? `<div class="winner-reveal" style="text-align:center;padding:18px 0;background:rgba(185,138,29,.08);border-radius:10px;">
+             <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">GAGNANT</p>
              <p class="display" style="font-size:28px;color:var(--stamp);margin:6px 0;">${esc(openDraw.winner.prenom)}</p>
              <p class="mono" style="font-size:13px;color:var(--stone);margin:0;">${esc(openDraw.winner.email)}</p>
              <p class="mono" style="font-size:11px;color:var(--stone);margin:10px 0 0;">Ce tirage est clôturé. Lance un nouveau tirage pour continuer.</p>
@@ -1761,34 +1805,34 @@ async function renderDetailInline(id, data, container){
       <label class="field">MESSAGE POUR LE GAGNANT</label>
       <input type="text" class="win-title" placeholder="Titre" style="margin-bottom:8px;">
       <textarea class="win-message" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
-      <button class="btn btn-primary send-win-btn" style="width:100%;margin-bottom:8px;">🏆 Envoyer au gagnant</button>
+      <button class="btn btn-primary send-win-btn btn-icon-label" style="width:100%;margin-bottom:8px;">${icon("trophy")}Envoyer au gagnant</button>
       <p class="win-status" style="font-size:12px;color:var(--stone);margin:0 0 16px;font-family:'IBM Plex Mono',monospace;"></p>
 
       <label class="field">MESSAGE POUR LES AUTRES PARTICIPANTS</label>
       <input type="text" class="lose-title" placeholder="Titre" style="margin-bottom:8px;">
       <textarea class="lose-message" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
-      <button class="btn btn-primary send-lose-btn" style="width:100%;">📣 Envoyer aux autres</button>
+      <button class="btn btn-secondary send-lose-btn btn-icon-label" style="width:100%;">${icon("megaphone")}Envoyer aux autres</button>
       <p class="lose-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
     </div>
-    ` : `<div style="margin-top:14px;text-align:center;padding:16px;background:var(--paper-deep);border-radius:6px;">
+    ` : `<div style="margin-top:14px;text-align:center;padding:16px;background:rgba(32,41,31,.04);border-radius:10px;">
         <p style="font-size:14px;color:var(--stone);margin:0 0 12px;font-family:'IBM Plex Mono',monospace;">Le QR code est prêt, mais rien à gagner tant qu'aucun tirage n'est lancé.</p>
-        <button class="btn btn-primary new-draw-btn2" style="width:100%;">🔄 Lancer un premier tirage</button>
+        <button class="btn btn-primary new-draw-btn2 btn-icon-label" style="width:100%;">${icon("refresh")}Lancer un premier tirage</button>
       </div>`}
 
     <div style="margin-top:16px;">
-      <button class="btn btn-secondary verify-winner-btn" style="width:100%;">🔍 Vérifier un gagnant</button>
+      <button class="btn btn-secondary verify-winner-btn btn-icon-label" style="width:100%;">${icon("search")}Vérifier un gagnant</button>
       <p style="font-size:11px;color:var(--stone);margin:6px 0 0;font-family:'IBM Plex Mono',monospace;text-align:center;">Pour confirmer un gagnant qui se présente en boutique.</p>
     </div>
 
     <div class="perf" style="margin:22px -20px;"></div>
 
     <details class="section" open>
-    <summary>🎁 Envoyer une promo</summary>
+    <summary style="display:flex;align-items:center;gap:8px;"><span class="icon-inline" style="margin:0;width:14px;height:14px;">${icon("gift")}</span>Envoyer une promo</summary>
     <div style="padding-top:10px;">
       <p class="promo-count" style="font-size:12px;color:var(--stone);margin:0 0 10px;font-family:'IBM Plex Mono',monospace;">Chargement…</p>
       <input type="text" class="promo-title" placeholder="Titre (ex: -20% ce week-end !)" style="margin-bottom:8px;">
       <textarea class="promo-message" placeholder="Message (ex: Reviens nous voir, offre valable jusqu'à dimanche)" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
-      <button class="btn btn-primary send-promo-btn" style="width:100%;">Envoyer aux clients qui ont accepté les offres</button>
+      <button class="btn btn-secondary send-promo-btn" style="width:100%;">Envoyer aux clients qui ont accepté les offres</button>
       <p class="promo-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
     </div>
     </details>
@@ -1833,8 +1877,8 @@ async function renderDetailInline(id, data, container){
     <div style="padding-top:10px;">
       <p style="font-size:11px;color:var(--stone);margin:0 0 10px;font-family:'IBM Plex Mono',monospace;">Base permanente de ce commerce, tous tirages confondus — différent du nombre d'inscrits à un tirage précis.</p>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
-        <button class="btn btn-secondary copy-list-btn" style="font-size:12px;padding:8px 10px;">📋 Copier</button>
-        <button class="btn btn-secondary csv-btn" style="font-size:12px;padding:8px 10px;">⬇️ CSV</button>
+        <button class="btn btn-secondary copy-list-btn btn-icon-label" style="font-size:12px;padding:8px 10px;">${icon("clipboard")}Copier</button>
+        <button class="btn btn-secondary csv-btn btn-icon-label" style="font-size:12px;padding:8px 10px;">${icon("download")}CSV</button>
       </div>
       <div class="clients-list">Chargement…</div>
     </div>
@@ -1986,7 +2030,7 @@ async function renderDetailInline(id, data, container){
           const chkData = await chk.json();
           if (chk.ok && typeof chkData.successful === "number") successful += chkData.successful;
         }
-        statusEl.textContent = `Livrée à ${successful} sur ${targeted} ciblé(s) ✅`;
+        statusEl.textContent = `Livrée à ${successful} sur ${targeted} ciblé(s)`;
         statusEl.style.color = "var(--stamp)";
       } catch(_) { /* on laisse le message provisoire si la vérif échoue */ }
     }, 4000);
@@ -2092,15 +2136,15 @@ async function renderDetailInline(id, data, container){
     let i = 0;
     const spin = setInterval(() => {
       const w = drawParticipants[Math.floor(Math.random()*drawParticipants.length)];
-      box.innerHTML = `<div style="text-align:center;padding:16px 0;background:var(--paper-deep);border-radius:6px;">
+      box.innerHTML = `<div style="text-align:center;padding:16px 0;background:rgba(32,41,31,.04);border-radius:10px;">
         <p class="mono" style="font-size:11px;color:var(--stone);margin:0;letter-spacing:.1em;">TIRAGE EN COURS...</p>
         <p class="display" style="font-size:24px;color:var(--carbon);margin:4px 0;">${esc(w.prenom)}</p>
       </div>`;
       i++;
       if (i > 16){
         clearInterval(spin);
-        box.innerHTML = `<div class="winner-reveal" style="text-align:center;padding:18px 0;background:var(--paper-deep);border-radius:6px;">
-          <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">🎉 GAGNANT 🎉</p>
+        box.innerHTML = `<div class="winner-reveal" style="text-align:center;padding:18px 0;background:rgba(185,138,29,.08);border-radius:10px;">
+          <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">GAGNANT</p>
           <p class="display" style="font-size:28px;color:var(--stamp);margin:6px 0;animation:stampIn .5s ease;">${esc(w.prenom)}</p>
           <p class="mono" style="font-size:13px;color:var(--stone);margin:0;">${esc(w.email)}</p>
         </div>`;
