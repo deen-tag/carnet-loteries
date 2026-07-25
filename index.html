@@ -190,9 +190,9 @@
   .admin-shell label.field{margin-bottom:6px;}
   .admin-shell .field-row{margin-bottom:16px;}
   /* barre de stats compacte (remplace les 4 grosses cartes empilées) */
-  .admin-shell .stat-bar{display:flex;background:var(--surface);border-radius:12px;border:1px solid rgba(32,41,31,.08);box-shadow:0 1px 2px rgba(32,41,31,.05), 0 4px 14px -10px rgba(32,41,31,.18);overflow:hidden;flex-wrap:wrap;}
-  .admin-shell .stat-chip{flex:1 1 auto;min-width:88px;padding:14px 16px;text-align:center;border-right:1px solid var(--line);}
-  .admin-shell .stat-chip:last-child{border-right:none;}
+  .admin-shell .stat-bar{display:grid;grid-template-columns:repeat(3, minmax(0,1fr));background:var(--surface);border-radius:12px;border:1px solid rgba(32,41,31,.08);box-shadow:0 1px 2px rgba(32,41,31,.05), 0 4px 14px -10px rgba(32,41,31,.18);overflow:hidden;}
+  .admin-shell .stat-chip{padding:14px 10px;text-align:center;border-right:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .admin-shell .stat-chip:nth-child(3n){border-right:none;}
   .admin-shell .stat-value{font-family:'Fraunces',serif;font-weight:600;font-size:22px;color:var(--stamp);line-height:1;}
   .admin-shell .stat-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.09em;color:var(--stone);text-transform:uppercase;margin-top:4px;display:block;}
   /* badge statut discret (remplace la grosse pastille) */
