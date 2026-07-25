@@ -1462,9 +1462,9 @@ function openAccountModal(user){
       <input type="text" id="a-current-pass" style="margin-bottom:8px;">
       <p class="a-status" style="font-size:12px;min-height:16px;margin:0 0 18px;font-family:'IBM Plex Mono',monospace;"></p>
 
-      <div style="display:flex;gap:10px;">
-        <button class="btn btn-secondary a-close" style="flex:1;">Fermer</button>
-        <button class="btn btn-primary a-save" style="flex:1;">Enregistrer les modifications</button>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn btn-primary a-save" style="width:100%;">Enregistrer</button>
+        <button class="btn btn-secondary a-close" style="width:100%;">Fermer</button>
       </div>
     </div>`;
   document.body.appendChild(bg);
