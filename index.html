@@ -1491,7 +1491,13 @@ function openAccountModal(user){
     statusEl.textContent = "…"; statusEl.style.color = "var(--stone)";
     try {
       await reauth();
-      await setDoc(doc(db,"usernames",newPseudo), { email: user.email.toLowerCase() });
+      // nettoie les anciens pseudos de ce compte : sinon ils restent actifs
+      // pour toujours et plusieurs pseudos finissent par pointer vers le
+      // même compte sans que personne ne le sache.
+      const myEmail = user.email.toLowerCase();
+      const oldSnap = await getDocs(query(collection(db,"usernames"), where("email","==",myEmail)));
+      await Promise.all(oldSnap.docs.filter(d => d.id !== newPseudo).map(d => deleteDoc(doc(db,"usernames",d.id))));
+      await setDoc(doc(db,"usernames",newPseudo), { email: myEmail });
       statusEl.textContent = "Pseudo mis à jour"; statusEl.style.color = "var(--stamp)";
     } catch(e) {
       statusEl.textContent = "Erreur : " + (e?.message || String(e)); statusEl.style.color = "var(--stamp)";
