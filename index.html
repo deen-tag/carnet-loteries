@@ -198,7 +198,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, getDocs, getDoc, query, where,
-  serverTimestamp, deleteDoc, doc, setDoc, updateDoc, onSnapshot, getCountFromServer
+  serverTimestamp, deleteDoc, doc, setDoc, updateDoc, onSnapshot, getCountFromServer, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -594,6 +594,22 @@ async function fetchRecentWinners(limitN){
 
 // Icônes ligne dessinées (remplacent les emojis). Trait fin, cohérent avec
 // l'esprit "imprimerie" de la marque — voir .icon-badge / .icon-inline.
+// Aide dates : on stocke toujours une date de tirage au format ISO
+// (YYYY-MM-DD, venant d'un <input type="date">) pour la logique métier,
+// et on affiche un texte français — construction en heure locale pour
+// éviter le décalage d'un jour lié au fuseau horaire.
+function formatFrenchDate(isoDate){
+  if (!isoDate) return "";
+  const [y,m,d] = isoDate.split("-").map(Number);
+  if (!y || !m || !d) return isoDate;
+  const dt = new Date(y, m-1, d);
+  return new Intl.DateTimeFormat("fr-FR", { day:"numeric", month:"long", year:"numeric" }).format(dt);
+}
+function todayISO(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
 function icon(name){
   const ICONS = {
     gift: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="16" height="11" rx="1"/><path d="M4 9h16v3H4z" fill="currentColor" fill-opacity=".14" stroke="none"/><path d="M12 9v11"/><path d="M12 9c-1.8 0-3.2-1.3-3.2-3S10.2 3 12 4.6C13.8 3 15.2 4.2 15.2 6S13.8 9 12 9z"/></svg>`,
@@ -1034,6 +1050,14 @@ async function renderPublic(id){
         await setDoc(doc(db, "participants", `${drawId}_${emailLower}`), {
           drawId, restaurantId: id, prenom, email: emailLower, wantsPromo, ts: serverTimestamp()
         });
+        // compteur permanent "depuis le début" — ne diminue jamais, même si
+        // le commerce/tirage est supprimé plus tard. Volontairement séparé
+        // des données elles-mêmes pour servir de preuve d'activité globale.
+        // Protégé : si la règle Firestore pour stats/global n'est pas encore
+        // en place, ça ne doit jamais empêcher la participation elle-même.
+        try {
+          await setDoc(doc(db, "stats", "global"), { totalParticipationsAllTime: increment(1) }, { merge: true });
+        } catch { /* le compteur de preuve n'est pas critique pour l'utilisateur */ }
       }
 
       // met à jour la base clients PERMANENTE de ce commerçant (indépendante
@@ -1142,6 +1166,7 @@ async function renderPublic(id){
 // ================= ADMIN DASHBOARD =================
 let allRestos = [];
 let allClientCounts = {};
+let allActiveDraws = {};
 let currentUser = null;
 let currentIsSuperAdmin = false;
 
@@ -1197,23 +1222,68 @@ async function loadList(user, isSuperAdmin){
     .filter(({data}) => isSuperAdmin || data.ownerUid === user.uid || (!data.ownerUid && (data.ownerEmail || "").toLowerCase() === myEmail));
 
   allClientCounts = {};
+  allActiveDraws = {};
+  let closedParticipations = 0;
   if (isSuperAdmin) {
     // le super-admin peut tout lire d'un coup (autorisé par les règles Firestore)
-    const cSnap = await getDocs(collection(db,"clients"));
+    const [cSnap, dSnap] = await Promise.all([
+      getDocs(collection(db,"clients")),
+      getDocs(collection(db,"draws"))
+    ]);
     cSnap.forEach(d => { const rid = d.data().restaurantId; allClientCounts[rid] = (allClientCounts[rid]||0)+1; });
+    dSnap.forEach(d => {
+      const draw = { id: d.id, ...d.data() };
+      if (draw.status === "open") allActiveDraws[draw.restaurantId] = draw;
+      else if (draw.status === "closed") closedParticipations += draw.participantCountAtClose || 0;
+    });
   } else {
     // un commerçant ne peut lire QUE ses propres clients (règles Firestore) —
     // lire la collection entière plante désormais avec "permission-denied".
     // On compte restaurant par restaurant avec une requête d'agrégation
     // (ne télécharge aucun document, juste un nombre : rapide et léger).
     await Promise.all(allRestos.map(async ({id}) => {
-      const cnt = await getCountFromServer(query(collection(db,"clients"), where("restaurantId","==",id)));
+      const [cnt, drawSnap] = await Promise.all([
+        getCountFromServer(query(collection(db,"clients"), where("restaurantId","==",id))),
+        getDocs(query(collection(db,"draws"), where("restaurantId","==",id)))
+      ]);
       allClientCounts[id] = cnt.data().count;
+      let openDraw = null;
+      drawSnap.forEach(d => {
+        const draw = { id: d.id, ...d.data() };
+        if (draw.status === "open") openDraw = draw;
+        else if (draw.status === "closed") closedParticipations += draw.participantCountAtClose || 0;
+      });
+      allActiveDraws[id] = openDraw;
     }));
   }
 
+  // nombre d'inscrits au tirage actif — uniquement pour les commerces qui en
+  // ont un, et via une requête d'agrégation (pas de documents téléchargés)
+  await Promise.all(Object.entries(allActiveDraws).map(async ([rid, draw]) => {
+    if (!draw) return;
+    try {
+      const pCnt = await getCountFromServer(query(collection(db,"participants"), where("restaurantId","==",rid), where("drawId","==",draw.id)));
+      draw.participantCount = pCnt.data().count;
+    } catch { draw.participantCount = null; }
+  }));
+
+  const activeParticipations = Object.values(allActiveDraws).reduce((s,d) => s + (d && d.participantCount ? d.participantCount : 0), 0);
+
+  let lifetimeChip = "";
+  if (isSuperAdmin) {
+    try {
+      const statsSnap = await getDoc(doc(db, "stats", "global"));
+      const lifetimeTotal = statsSnap.exists() ? (statsSnap.data().totalParticipationsAllTime || 0) : 0;
+      lifetimeChip = statChip("Depuis le début", lifetimeTotal);
+    } catch { /* pas grave si le doc/règle n'existe pas encore */ }
+  }
+
   document.getElementById("stats-bar").innerHTML =
-    statChip(isSuperAdmin ? "Commerces" : "Ton commerce", allRestos.length) + statChip("Clients", allRestos.reduce((s,{id}) => s + (allClientCounts[id]||0), 0));
+    statChip(isSuperAdmin ? "Commerces" : "Ton commerce", allRestos.length) +
+    statChip("Clients", allRestos.reduce((s,{id}) => s + (allClientCounts[id]||0), 0)) +
+    statChip("Tirages actifs", Object.values(allActiveDraws).filter(Boolean).length) +
+    statChip("Participations", closedParticipations + activeParticipations) +
+    lifetimeChip;
   document.getElementById("search-wrap").classList.toggle("hidden", allRestos.length < 5);
 
   renderList("");
@@ -1243,13 +1313,32 @@ function renderList(filterText){
     wrap.style.padding = "0";
     wrap.style.animationDelay = `${Math.min(idx*40,240)}ms`;
     const ticketNo = String(id).slice(0,4).toUpperCase().replace(/[^A-Z0-9]/g,"0");
+    const draw = allActiveDraws[id];
+    // "à clôturer" seulement si on a une vraie date ISO fiable (nouveaux
+    // tirages) — jamais déduit d'un texte libre, pour éviter les faux positifs
+    const isOverdue = !!(draw && draw.drawDate && draw.drawDate < todayISO());
+    const statusBadge = !draw
+      ? `<span class="mono" style="font-size:10px;color:var(--stone);display:inline-flex;align-items:center;gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--stone);display:inline-block;"></span>Aucun tirage</span>`
+      : isOverdue
+      ? `<span class="mono" style="font-size:10px;color:#a8631c;display:inline-flex;align-items:center;gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#c97d1f;display:inline-block;"></span>À clôturer</span>`
+      : `<span class="mono" style="font-size:10px;color:#3f7a3f;display:inline-flex;align-items:center;gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#3f7a3f;display:inline-block;"></span>Tirage actif</span>`;
+    const drawInfo = draw
+      ? `<div style="margin-top:8px;font-size:12px;color:var(--ink);font-family:'IBM Plex Mono',monospace;line-height:1.6;">
+           <span style="display:flex;align-items:center;"><span class="icon-inline" style="margin:0 6px 0 0;width:12px;height:12px;">${icon("gift")}</span>${esc(draw.prize||"—")}</span>
+           <span style="display:flex;align-items:center;color:var(--stone);"><span class="icon-inline" style="margin:0 6px 0 0;width:12px;height:12px;">${icon("calendar")}</span>${draw.date ? esc(draw.date) : "date à définir"}${draw.participantCount != null ? ` · ${draw.participantCount} participant(s)` : ""}</span>
+         </div>`
+      : "";
     wrap.innerHTML = `
       <div class="resto-header" style="display:flex;justify-content:space-between;align-items:center;padding:18px 20px;cursor:pointer;gap:14px;">
-        <div style="display:flex;align-items:center;gap:16px;min-width:0;">
+        <div style="display:flex;align-items:center;gap:16px;min-width:0;flex:1;">
           <div class="ticket-no" style="font-size:26px;color:var(--carbon);flex-shrink:0;">${esc(ticketNo)}</div>
-          <div style="min-width:0;">
-            <span class="stamp">${allClientCounts[id]||0} client(s)</span>
+          <div style="min-width:0;flex:1;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span class="stamp">${allClientCounts[id]||0} client(s)</span>
+              ${statusBadge}
+            </div>
             <h3 class="display" style="font-size:19px;margin:8px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(data.name)}</h3>
+            ${drawInfo}
           </div>
         </div>
         <button class="btn btn-secondary del-btn ${currentIsSuperAdmin ? "" : "hidden"}" style="padding:8px 12px;flex-shrink:0;">🗑️</button>
@@ -1460,7 +1549,7 @@ function openNewDrawModal(id, restoName, oldDrawId, onDone){
       <label class="field">LOT À GAGNER</label>
       <input type="text" id="d-prize" placeholder="Un menu offert" style="margin-bottom:14px;">
       <label class="field">DATE DU TIRAGE (optionnel)</label>
-      <input type="text" id="d-date" placeholder="15 août 2026" style="margin-bottom:14px;">
+      <input type="date" id="d-date" style="margin-bottom:14px;">
       <p id="d-err" class="err"></p>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-secondary" style="flex:1;" id="d-cancel">Annuler</button>
@@ -1473,7 +1562,8 @@ function openNewDrawModal(id, restoName, oldDrawId, onDone){
   document.getElementById("d-cancel").onclick = () => bg.remove();
   document.getElementById("d-save").onclick = async () => {
     const prize = document.getElementById("d-prize").value.trim();
-    const date = document.getElementById("d-date").value.trim();
+    const drawDateISO = document.getElementById("d-date").value.trim();
+    const date = drawDateISO ? formatFrenchDate(drawDateISO) : "";
     const errEl = document.getElementById("d-err");
     if (!prize){ errEl.textContent = "Le lot est obligatoire."; return; }
     const btn = document.getElementById("d-save");
@@ -1486,7 +1576,7 @@ function openNewDrawModal(id, restoName, oldDrawId, onDone){
         });
       }
       await addDoc(collection(db,"draws"), {
-        restaurantId: id, prize, date, status: "open", winner: null, createdAt: serverTimestamp()
+        restaurantId: id, prize, date, drawDate: drawDateISO || null, status: "open", winner: null, createdAt: serverTimestamp()
       });
       bg.remove();
       toast("Nouveau tirage lancé");
@@ -1635,9 +1725,7 @@ async function renderDetailInline(id, data, container){
       </div>
     </div>
 
-    <div style="margin-top:16px;">
-      <button class="btn btn-secondary verify-winner-btn" style="width:100%;">🔍 Vérifier un gagnant</button>
-    </div>
+    <div style="margin-top:2px;"></div>
 
     <div class="perf" style="margin:22px -20px;"></div>
 
@@ -1687,6 +1775,11 @@ async function renderDetailInline(id, data, container){
         <button class="btn btn-primary new-draw-btn2" style="width:100%;">🔄 Lancer un premier tirage</button>
       </div>`}
 
+    <div style="margin-top:16px;">
+      <button class="btn btn-secondary verify-winner-btn" style="width:100%;">🔍 Vérifier un gagnant</button>
+      <p style="font-size:11px;color:var(--stone);margin:6px 0 0;font-family:'IBM Plex Mono',monospace;text-align:center;">Pour confirmer un gagnant qui se présente en boutique.</p>
+    </div>
+
     <div class="perf" style="margin:22px -20px;"></div>
 
     <details class="section" open>
@@ -1701,6 +1794,21 @@ async function renderDetailInline(id, data, container){
     </details>
 
     <div class="perf" style="margin:22px -20px;"></div>
+
+    ${(() => {
+      const recentWinners = closedDraws.filter(d => d.winner).slice(0, 3);
+      if (recentWinners.length === 0) return "";
+      return `
+      <div style="margin-bottom:4px;">
+        <span class="mono" style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stone);display:block;margin-bottom:8px;">Derniers gagnants</span>
+        ${recentWinners.map(d => `
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px dashed var(--line);">
+            <span class="display" style="font-size:14px;">${esc(d.winner.prenom)}</span>
+            <span class="mono" style="font-size:11px;color:var(--stone);">${d.date ? esc(d.date) : ""}</span>
+          </div>`).join("")}
+      </div>
+      <div class="perf" style="margin:22px -20px;"></div>`;
+    })()}
 
     <details class="section">
     <summary>Historique des tirages ${closedDraws.length ? `(${closedDraws.length})` : ""}</summary>
