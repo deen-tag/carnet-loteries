@@ -83,8 +83,8 @@
   .resto-card:hover{box-shadow:0 1px 0 var(--line), 0 16px 30px -16px rgba(32,41,31,.45);}
   .modal-bg{position:fixed;inset:0;background:rgba(32,41,31,.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;animation:fadeIn .18s ease;}
   .hidden{display:none !important;}
-  .participant-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:9px 12px;background:#fff;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;flex-wrap:wrap;gap:6px;font-family:'IBM Plex Mono',monospace;animation:rise .25s ease both;}
-  .history-row{padding:12px 14px;background:#fff;border-radius:3px;border:1px solid var(--line);margin-bottom:8px;}
+  .participant-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:11px 14px;background:#fff;border-radius:4px;border:1px solid var(--line);margin-bottom:8px;flex-wrap:wrap;gap:6px;font-family:'IBM Plex Mono',monospace;animation:rise .25s ease both;}
+  .history-row{padding:14px 16px;background:#fff;border-radius:4px;border:1px solid var(--line);margin-bottom:12px;}
 
   details.section > summary{cursor:pointer;list-style:none;font-family:'Fraunces',serif;font-size:16px;font-weight:600;display:flex;justify-content:space-between;align-items:center;padding:4px 0;}
   details.section > summary::-webkit-details-marker{display:none;}
@@ -1319,7 +1319,8 @@ async function renderAdmin(user){
         ${isSuperAdmin ? `<button class="btn btn-primary" id="btn-add">+ Nouveau commerce</button>` : ""}
       </div>
     </div>
-    <div id="stats-bar" class="anim-rise" style="margin-bottom:20px;"></div>
+    <div id="stats-bar" class="anim-rise" style="margin-bottom:10px;"></div>
+    <div id="summary-banner" class="anim-rise mono" style="font-size:12px;color:var(--stone);margin:0 2px 20px;"></div>
     ${isSuperAdmin ? `<div id="merchant-requests" class="anim-rise" style="margin-bottom:20px;"></div>` : ""}
     <div id="search-wrap" class="anim-rise hidden" style="margin-bottom:16px;">
       <input type="text" id="search-input" placeholder="Rechercher un commerce…">
@@ -1466,6 +1467,15 @@ async function loadList(user, isSuperAdmin){
     statChip("Participations", closedParticipations + activeParticipations) +
     lifetimeChip +
     `</div>`;
+
+  // bannière résumé : un signal utile en un coup d'œil (pas juste une redite des stats du dessus)
+  const overdueCount = Object.values(allActiveDraws).filter(d => d && d.drawDate && d.drawDate < todayISO()).length;
+  const bannerParts = [];
+  if (overdueCount > 0) {
+    bannerParts.push(`<span style="color:var(--stamp);font-weight:600;">${overdueCount} commerce${overdueCount === 1 ? "" : "s"} avec un tirage à clôturer</span>`);
+  }
+  bannerParts.push(`${activeParticipations} inscrit${activeParticipations === 1 ? "" : "s"} sur le${Object.values(allActiveDraws).filter(Boolean).length === 1 ? " tirage" : "s tirages"} en cours`);
+  document.getElementById("summary-banner").innerHTML = bannerParts.join(" &nbsp;·&nbsp; ");
   document.getElementById("search-wrap").classList.toggle("hidden", allRestos.length < 5);
 
   renderList("");
@@ -2032,7 +2042,9 @@ async function renderDetailInline(id, data, container){
             <strong style="font-family:'Fraunces',serif;font-size:14px;">${esc(d.prize)}</strong>${d.date ? " · " + esc(d.date) : ""}<br>
             <span style="color:var(--stone);">${d.participantCountAtClose ?? "?"} inscrit(s) à ce tirage</span>
             ${d.winner ? ` · Gagnant : <span style="color:var(--stamp);">${esc(d.winner.prenom)}</span>` : ""}
-            <br><a href="#" class="hist-view mono" data-draw-id="${d.id}" style="font-size:11px;text-decoration:underline;text-underline-offset:2px;">Voir les inscrits →</a>
+            <div style="margin-top:8px;">
+              <button class="btn btn-secondary hist-view btn-icon-label" data-draw-id="${d.id}" style="font-size:11px;padding:6px 10px;">${icon("search")}Voir les inscrits</button>
+            </div>
             <div class="hist-list-${d.id}" style="margin-top:8px;display:none;"></div>
           </div>`).join("")}
     </div>
@@ -2111,10 +2123,12 @@ async function renderDetailInline(id, data, container){
       listEl.innerHTML = `<p style="font-size:13px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">Personne n'a encore scanné le QR code.</p>`;
     } else {
       listEl.innerHTML = clients.map(c => `
-        <div class="participant-row">
-          <span style="font-weight:600;font-family:'Fraunces',serif;">${esc(c.prenom)}</span>
-          <span style="color:var(--stone);">${esc(c.email)}</span>
-          <span style="color:${c.wantsPromo ? "var(--gold)" : "var(--stone)"};">${c.wantsPromo ? "promo ok" : ""}</span>
+        <div class="participant-row" style="flex-direction:column;align-items:stretch;gap:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <span style="font-weight:600;font-family:'Fraunces',serif;font-size:14px;">${esc(c.prenom)}</span>
+            ${c.wantsPromo ? `<span class="client-badge" style="background:rgba(185,138,29,.12);color:var(--gold);">✓ Promo acceptée</span>` : ""}
+          </div>
+          <span style="color:var(--stone);font-size:12px;">${esc(c.email)}</span>
         </div>`).join("");
     }
   }
