@@ -355,6 +355,7 @@ function renderAdminGate(){
           <p style="text-align:right;margin:0 0 10px;"><a href="#" id="gate-forgot" style="font-size:12px;color:var(--stone);">Mot de passe oublié ?</a></p>
           <p id="gate-err" class="err" style="margin-bottom:10px;"></p>
           <button class="btn btn-primary" id="gate-submit" style="width:100%;">Se connecter</button>
+          <p style="margin:16px 0 0;font-size:12px;color:var(--stone);">Pas encore de compte ? <a href="#" id="gate-merchant-request" style="color:var(--stamp);text-decoration:underline;text-underline-offset:3px;">Je veux Tiketo dans mon commerce →</a></p>
         </div>
       </div>`;
     const emailEl = document.getElementById("gate-email");
@@ -362,6 +363,7 @@ function renderAdminGate(){
     passEl.type = "password";
     emailEl.focus();
     const errEl = document.getElementById("gate-err");
+    document.getElementById("gate-merchant-request").onclick = (e) => { e.preventDefault(); openMerchantRequestModal(); };
 
     async function resolveLoginEmail(input){
       const v = input.trim();
@@ -478,7 +480,7 @@ function renderAbout(){
         <span class="mono" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--carbon);display:block;margin-bottom:8px;">Pour ton commerce</span>
         <h3 class="display" style="font-size:17px;margin:0 0 8px;">Proposer un cadeau, créer du lien.</h3>
         <p style="font-size:13.5px;line-height:1.7;color:var(--ink);margin:0 0 14px;">Tu choisis le lot, tu fixes la date, tes clients participent. Une expérience positive autour de ton commerce — et, avec leur accord, la possibilité de rester en contact avec eux ensuite.</p>
-        <a href="?admin=1" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Accéder à mon espace →</a>
+        <button class="btn btn-primary" id="about-merchant-request" style="display:inline-block;">Je veux Tiketo dans mon commerce →</button>
       </div>
     </div>
 
@@ -502,6 +504,7 @@ function renderAbout(){
     ${legalFooterHtml()}
   `;
   initReveal();
+  document.getElementById("about-merchant-request").onclick = openMerchantRequestModal;
 }
 
 // ================= PAGES LÉGALES (règlement / confidentialité / CGU) =================
@@ -793,7 +796,7 @@ async function renderHome(){
         <p>Tu gardes la possibilité de rester en contact avec les participants qui l'acceptent.</p>
       </div>
 
-      <a href="?admin=1" class="btn btn-primary" style="display:inline-block;text-decoration:none;margin-top:18px;">Accéder à mon espace →</a>
+      <button class="btn btn-primary" id="home-merchant-request-1" style="display:inline-block;margin-top:18px;">Je veux Tiketo dans mon commerce →</button>
     </div>
 
     <!-- 6. APRÈS LE TIRAGE — la phrase-manifeste -->
@@ -826,21 +829,91 @@ async function renderHome(){
       </div>
       <div class="door-card">
         <span class="icon-badge" style="margin-bottom:10px;">${icon("store")}</span>
-        <h3 class="display" style="font-size:16px;">Je suis commerçant</h3>
+        <h3 class="display" style="font-size:16px;">Je veux Tiketo dans mon commerce</h3>
         <p>Crée ton tirage. Choisis ton cadeau. Choisis ta date.</p>
-        <a href="?admin=1" class="btn btn-primary" style="display:inline-block;text-decoration:none;">Accéder à mon espace →</a>
+        <button class="btn btn-primary" id="home-merchant-request-2" style="display:inline-block;">Faire une demande →</button>
       </div>
     </div>
 
     ${legalFooterHtml()}
   `;
   initReveal();
+  document.getElementById("home-merchant-request-1").onclick = openMerchantRequestModal;
+  document.getElementById("home-merchant-request-2").onclick = openMerchantRequestModal;
 
   const winnersEl = document.getElementById("home-winners");
   const rows = await fetchRecentWinners(6);
   winnersEl.innerHTML = rows.length === 0
     ? `<p style="color:var(--stone);font-family:'IBM Plex Mono',monospace;font-size:13px;">Aucun tirage clôturé pour l'instant — reviens bientôt !</p>`
     : rows.map(winnerRowHtml).join("");
+}
+
+// ================= DEMANDE D'ACCÈS COMMERÇANT (formulaire public) =================
+// Remplace l'ancien lien direct vers ?admin=1 : un prospect n'a pas de compte,
+// donc on collecte sa demande dans Firestore plutôt que de l'envoyer sur un
+// écran de connexion qui ne peut pas fonctionner pour lui.
+// ⚠️ nécessite une règle Firestore autorisant la création (create uniquement,
+// pas read/update/delete) sur la collection "merchantRequests" pour les
+// visiteurs non connectés.
+function openMerchantRequestModal(){
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.innerHTML = `
+    <div class="card" style="max-width:380px;width:100%;">
+      <span class="stamp"><span class="icon-inline" style="margin:0 5px 0 0;width:11px;height:11px;color:var(--stamp);">${icon("store")}</span>Devenir partenaire</span>
+      <h3 class="display" style="margin:12px 0 4px;">Tiketo dans ton commerce</h3>
+      <p style="font-size:13px;line-height:1.6;color:var(--stone);margin:0 0 18px;">Laisse-nous tes coordonnées, on te recontacte pour créer ton tirage.</p>
+
+      <label class="field">NOM DU COMMERCE</label>
+      <input type="text" id="mr-name" placeholder="Pizzeria Bella" style="margin-bottom:14px;">
+      <label class="field">TON EMAIL</label>
+      <input type="text" id="mr-email" placeholder="toi@commerce.com" style="margin-bottom:14px;">
+      <label class="field">TÉLÉPHONE (optionnel)</label>
+      <input type="text" id="mr-phone" placeholder="06 12 34 56 78" style="margin-bottom:14px;">
+      <label class="field">MESSAGE (optionnel)</label>
+      <textarea id="mr-message" rows="3" placeholder="Ton commerce, ce que tu voudrais offrir…" style="width:100%;padding:11px 12px;border-radius:3px;border:1.5px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:14px;background:#fff;color:var(--ink);resize:vertical;margin-bottom:8px;"></textarea>
+      <p id="mr-status" style="font-size:12px;min-height:16px;margin:0 0 16px;font-family:'IBM Plex Mono',monospace;"></p>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn btn-primary" id="mr-send" style="width:100%;">Envoyer la demande</button>
+        <button class="btn btn-secondary" id="mr-close" style="width:100%;">Fermer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  document.getElementById("mr-name").focus();
+  bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+  document.getElementById("mr-close").onclick = () => bg.remove();
+
+  document.getElementById("mr-send").onclick = async () => {
+    const name = document.getElementById("mr-name").value.trim();
+    const email = document.getElementById("mr-email").value.trim().toLowerCase();
+    const phone = document.getElementById("mr-phone").value.trim();
+    const message = document.getElementById("mr-message").value.trim();
+    const statusEl = document.getElementById("mr-status");
+    const btn = document.getElementById("mr-send");
+
+    if (!name) { statusEl.textContent = "Le nom du commerce est requis."; statusEl.style.color = "var(--stamp)"; return; }
+    if (!email || !email.includes("@")) { statusEl.textContent = "Email invalide."; statusEl.style.color = "var(--stamp)"; return; }
+
+    btn.disabled = true; statusEl.textContent = "Envoi…"; statusEl.style.color = "var(--stone)";
+    try {
+      await addDoc(collection(db, "merchantRequests"), {
+        name, email, phone, message,
+        status: "pending",
+        createdAt: serverTimestamp()
+      });
+      bg.querySelector(".card").innerHTML = `
+        <span class="stamp"><span class="icon-inline" style="margin:0 5px 0 0;width:11px;height:11px;color:var(--stamp);">${icon("store")}</span>Demande envoyée</span>
+        <h3 class="display" style="margin:12px 0 8px;">Merci !</h3>
+        <p style="font-size:14px;line-height:1.7;color:var(--ink);margin:0 0 18px;">On revient vers toi rapidement à l'adresse indiquée pour créer ton tirage Tiketo.</p>
+        <button class="btn btn-secondary" id="mr-close-2" style="width:100%;">Fermer</button>`;
+      bg.querySelector("#mr-close-2").onclick = () => bg.remove();
+    } catch(e) {
+      statusEl.textContent = "Erreur : " + (e?.message || String(e));
+      statusEl.style.color = "var(--stamp)";
+      btn.disabled = false;
+    }
+  };
 }
 
 // ================= RECHERCHE DE GAGNANTS PAR COMMERCE =================
@@ -1233,6 +1306,7 @@ async function renderAdmin(user){
       </div>
     </div>
     <div id="stats-bar" class="anim-rise" style="margin-bottom:20px;"></div>
+    ${isSuperAdmin ? `<div id="merchant-requests" class="anim-rise" style="margin-bottom:20px;"></div>` : ""}
     <div id="search-wrap" class="anim-rise hidden" style="margin-bottom:16px;">
       <input type="text" id="search-input" placeholder="Rechercher un commerce…">
     </div>
@@ -1246,6 +1320,56 @@ async function renderAdmin(user){
   document.getElementById("btn-logout").onclick = () => signOut(auth);
   document.getElementById("search-input").oninput = (e) => renderList(e.target.value);
   await loadList(user, isSuperAdmin);
+  if (isSuperAdmin) await loadMerchantRequests();
+}
+
+// ---------- Demandes d'accès en attente (super-admin uniquement) ----------
+async function loadMerchantRequests(){
+  const el = document.getElementById("merchant-requests");
+  if (!el) return;
+  let snap;
+  try {
+    snap = await getDocs(query(collection(db,"merchantRequests"), where("status","==","pending")));
+  } catch(e) {
+    el.innerHTML = "";
+    return;
+  }
+  if (snap.empty) { el.innerHTML = ""; return; }
+
+  const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+  el.innerHTML = `
+    <div class="card">
+      <span class="section-eyebrow stamp-tone" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;font-family:'IBM Plex Mono',monospace;">Demandes d'accès (${items.length})</span>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">
+        ${items.map(it => `
+          <div class="mr-item" data-id="${esc(it.id)}" style="border:1px solid rgba(32,41,31,.1);border-radius:10px;padding:14px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+              <div>
+                <strong style="font-family:'Fraunces',serif;font-size:15px;">${esc(it.name||"")}</strong>
+                <p style="margin:2px 0 0;font-size:12.5px;color:var(--stone);font-family:'IBM Plex Mono',monospace;">${esc(it.email||"")}${it.phone ? " · " + esc(it.phone) : ""}</p>
+              </div>
+            </div>
+            ${it.message ? `<p style="margin:8px 0 0;font-size:13px;color:var(--ink);">${esc(it.message)}</p>` : ""}
+            <div style="display:flex;gap:8px;margin-top:10px;">
+              <button class="btn btn-primary mr-create" style="flex:1;font-size:12.5px;padding:8px 10px;">Créer ce commerce</button>
+              <button class="btn btn-secondary mr-dismiss" style="flex:1;font-size:12.5px;padding:8px 10px;">Ignorer</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>`;
+
+  el.querySelectorAll(".mr-item").forEach(row => {
+    const id = row.dataset.id;
+    const it = items.find(i => i.id === id);
+    row.querySelector(".mr-create").onclick = () => openAddModal({ name: it.name, email: it.email, requestId: id });
+    row.querySelector(".mr-dismiss").onclick = async () => {
+      await updateDoc(doc(db,"merchantRequests", id), { status: "dismissed" });
+      await loadMerchantRequests();
+    };
+  });
 }
 function statChip(label, value){
   return `<div class="stat-chip">
@@ -1549,7 +1673,8 @@ function openAccountModal(user){
   };
 }
 
-function openAddModal(){
+function openAddModal(prefill){
+  prefill = prefill || {};
   const bg = document.createElement("div");
   bg.className = "modal-bg admin-shell";
   bg.innerHTML = `
@@ -1557,9 +1682,9 @@ function openAddModal(){
       <span class="stamp">Nouveau ticket</span>
       <h3 class="display" style="margin:12px 0 16px;">Nouveau commerce</h3>
       <label class="field">NOM DU COMMERCE</label>
-      <input type="text" id="m-name" placeholder="Pizzeria Bella" style="margin-bottom:14px;">
+      <input type="text" id="m-name" placeholder="Pizzeria Bella" value="${esc(prefill.name||"")}" style="margin-bottom:14px;">
       <label class="field">EMAIL DU COMMERÇANT (son accès pour se connecter)</label>
-      <input type="text" id="m-owner-email" placeholder="proprietaire@commerce.com" style="margin-bottom:14px;">
+      <input type="text" id="m-owner-email" placeholder="proprietaire@commerce.com" value="${esc(prefill.email||"")}" style="margin-bottom:14px;">
       <label class="field">MOT DE PASSE INITIAL (il pourra le changer)</label>
       <input type="text" id="m-password" placeholder="6 caractères minimum" style="margin-bottom:14px;">
       <label class="field">PSEUDO (optionnel, pour se connecter sans taper l'email)</label>
@@ -1592,6 +1717,10 @@ function openAddModal(){
       });
       const out = await r.json();
       if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
+      if (prefill.requestId) {
+        await updateDoc(doc(db,"merchantRequests", prefill.requestId), { status: "done" });
+        await loadMerchantRequests();
+      }
       bg.remove();
       toast(`"${name}" créé — QR code prêt`);
       await loadList();
