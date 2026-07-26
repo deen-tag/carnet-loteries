@@ -1957,7 +1957,7 @@ async function renderDetailInline(id, data, container){
 
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
       <div>
-        <h4 class="display" style="margin:0 0 4px;font-size:16px;">Tirage en cours</h4>
+        <h4 class="display" style="margin:0 0 4px;font-size:16px;">${(openDraw && !openDraw.winner) ? "Tirage en cours" : (currentDraw ? "Dernier tirage" : "Tirage")}</h4>
         ${currentDraw
           ? `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">${esc(currentDraw.prize)}${currentDraw.date ? " · " + esc(currentDraw.date) : ""}</p>`
           : `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">Aucun tirage actif.</p>`}
@@ -1984,6 +1984,7 @@ async function renderDetailInline(id, data, container){
     </div>
 
     <div class="winner-msgs ${currentDraw.winner ? "" : "hidden"}" style="margin-top:16px;">
+      <div style="border-top:1px dashed var(--line);margin:0 0 20px;"></div>
       <label class="field" style="color:var(--gold);">MESSAGE POUR LE GAGNANT</label>
       <input type="text" class="win-title" placeholder="Titre" style="margin-bottom:8px;">
       <textarea class="win-message" rows="4" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
