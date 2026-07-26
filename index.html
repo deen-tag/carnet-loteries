@@ -205,7 +205,11 @@
   .admin-shell .qr-ticket{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 14px 18px;position:relative;box-shadow:0 1px 0 var(--line), 0 8px 18px -12px rgba(32,41,31,.3);}
   .admin-shell .qr-ticket::after{content:"";position:absolute;left:8px;right:8px;bottom:4px;height:11px;background-image:radial-gradient(circle 5px, var(--admin-bg) 5px, transparent 5.3px);background-repeat:repeat-x;background-position:0 center;background-size:18px 18px;}
   .admin-shell .qr-ticket-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);display:block;margin-bottom:10px;text-align:center;}
-  /* badge statut discret (remplace la grosse pastille) */
+  /* ---- blocs de message groupés, pour distinguer gagnant / autres participants ---- */
+  .admin-shell .msg-block{background:var(--admin-bg);border:1px solid var(--line);border-radius:8px;padding:14px 14px 4px;margin-bottom:14px;}
+  .admin-shell .msg-block.to-winner{border-left:3px solid var(--gold);}
+  .admin-shell .msg-block.to-others{border-left:3px solid var(--carbon);}
+  .admin-shell .msg-block textarea{background:#fff;}
   .admin-shell .status-dot{display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;white-space:nowrap;}
   .admin-shell .status-dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;}
   /* ---- statut "tirage actif" mis en avant comme un tampon (signature de la marque) ---- */
@@ -1926,6 +1930,11 @@ async function renderDetailInline(id, data, container){
   const openDraw = allDraws.find(d => d.status === "open");
   const closedDraws = allDraws.filter(d => d.status === "closed")
     .sort((a,b) => (b.closedAt?.toMillis?.()||0) - (a.closedAt?.toMillis?.()||0));
+  // tirage à afficher dans la carte "en cours" : le vrai tirage ouvert, sinon le
+  // dernier clôturé — pour garder l'accès à "envoyer au gagnant" après un
+  // rafraîchissement, maintenant que le tirage passe bien en "closed" dès le
+  // tirage du gagnant (et non plus seulement au lancement d'un nouveau tirage).
+  const currentDraw = openDraw || closedDraws[0];
 
   container.innerHTML = `
     <div style="border-top:1px dashed var(--line);margin:0 0 18px;"></div>
@@ -1954,43 +1963,47 @@ async function renderDetailInline(id, data, container){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
       <div>
         <h4 class="display" style="margin:0 0 4px;font-size:16px;">Tirage en cours</h4>
-        ${openDraw
-          ? `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">${esc(openDraw.prize)}${openDraw.date ? " · " + esc(openDraw.date) : ""}</p>`
+        ${currentDraw
+          ? `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">${esc(currentDraw.prize)}${currentDraw.date ? " · " + esc(currentDraw.date) : ""}</p>`
           : `<p style="font-size:13px;color:var(--stone);margin:0;font-family:'IBM Plex Mono',monospace;">Aucun tirage actif.</p>`}
       </div>
-      ${openDraw ? `<button class="btn btn-secondary new-draw-btn btn-icon-label" style="font-size:12px;padding:8px 10px;">${icon("refresh")}Nouveau tirage</button>` : ""}
+      ${currentDraw ? `<button class="btn btn-secondary new-draw-btn btn-icon-label" style="font-size:12px;padding:8px 10px;">${icon("refresh")}Nouveau tirage</button>` : ""}
     </div>
 
-    ${openDraw ? `
-    ${!openDraw.winner ? `
+    ${currentDraw ? `
+    ${openDraw && !openDraw.winner ? `
     <div style="margin-top:16px;display:flex;justify-content:flex-end;">
       <button class="btn btn-primary draw-btn btn-icon-label">${icon("gift")}Tirer un gagnant <span class="live-draw-count"></span></button>
     </div>
     <p style="font-size:11px;color:var(--stone);margin:4px 0 0;font-family:'IBM Plex Mono',monospace;text-align:right;">Inscrits à CE tirage uniquement</p>
     ` : ""}
     <div class="winner-box" style="font-size:13px;color:var(--stone);margin-top:10px;font-family:'IBM Plex Mono',monospace;">
-      ${openDraw.winner
+      ${currentDraw.winner
         ? `<div class="winner-reveal" style="text-align:center;padding:18px 0;background:rgba(185,138,29,.08);border-radius:10px;">
              <p class="mono" style="font-size:11px;color:var(--gold);margin:0;letter-spacing:.14em;">GAGNANT</p>
-             <p class="display" style="font-size:28px;color:var(--stamp);margin:6px 0;">${esc(openDraw.winner.prenom)}</p>
-             <p class="mono" style="font-size:13px;color:var(--stone);margin:0;">${esc(openDraw.winner.email)}</p>
+             <p class="display" style="font-size:28px;color:var(--stamp);margin:6px 0;">${esc(currentDraw.winner.prenom)}</p>
+             <p class="mono" style="font-size:13px;color:var(--stone);margin:0;">${esc(currentDraw.winner.email)}</p>
              <p class="mono" style="font-size:11px;color:var(--stone);margin:10px 0 0;">Ce tirage est clôturé. Lance un nouveau tirage pour continuer.</p>
            </div>`
         : `Clique sur "Tirer un gagnant" quand tu es prêt.`}
     </div>
 
-    <div class="winner-msgs ${openDraw.winner ? "" : "hidden"}" style="margin-top:16px;">
-      <label class="field">MESSAGE POUR LE GAGNANT</label>
-      <input type="text" class="win-title" placeholder="Titre" style="margin-bottom:8px;">
-      <textarea class="win-message" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
-      <button class="btn btn-primary send-win-btn btn-icon-label" style="width:100%;margin-bottom:8px;">${icon("trophy")}Envoyer au gagnant</button>
-      <p class="win-status" style="font-size:12px;color:var(--stone);margin:0 0 16px;font-family:'IBM Plex Mono',monospace;"></p>
+    <div class="winner-msgs ${currentDraw.winner ? "" : "hidden"}" style="margin-top:16px;">
+      <div class="msg-block to-winner">
+        <label class="field">MESSAGE POUR LE GAGNANT</label>
+        <input type="text" class="win-title" placeholder="Titre" style="margin-bottom:8px;">
+        <textarea class="win-message" rows="4" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:10px;"></textarea>
+        <button class="btn btn-primary send-win-btn btn-icon-label" style="width:100%;margin-bottom:8px;">${icon("trophy")}Envoyer au gagnant</button>
+        <p class="win-status" style="font-size:12px;color:var(--stone);margin:0 0 12px;font-family:'IBM Plex Mono',monospace;"></p>
+      </div>
 
-      <label class="field">MESSAGE POUR LES AUTRES PARTICIPANTS</label>
-      <input type="text" class="lose-title" placeholder="Titre" style="margin-bottom:8px;">
-      <textarea class="lose-message" rows="2" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
-      <button class="btn btn-secondary send-lose-btn btn-icon-label" style="width:100%;">${icon("megaphone")}Envoyer aux autres</button>
-      <p class="lose-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
+      <div class="msg-block to-others">
+        <label class="field">MESSAGE POUR LES AUTRES PARTICIPANTS</label>
+        <input type="text" class="lose-title" placeholder="Titre" style="margin-bottom:8px;">
+        <textarea class="lose-message" rows="4" style="width:100%;padding:10px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;resize:vertical;margin-bottom:10px;"></textarea>
+        <button class="btn btn-secondary send-lose-btn btn-icon-label" style="width:100%;">${icon("megaphone")}Envoyer aux autres</button>
+        <p class="lose-status" style="font-size:12px;color:var(--stone);margin-top:8px;font-family:'IBM Plex Mono',monospace;"></p>
+      </div>
     </div>
     ` : `<div style="margin-top:14px;text-align:center;padding:16px;background:rgba(32,41,31,.04);border-radius:10px;">
         <p style="font-size:14px;color:var(--stone);margin:0 0 12px;font-family:'IBM Plex Mono',monospace;">Le QR code est prêt, mais rien à gagner tant qu'aucun tirage n'est lancé.</p>
@@ -2218,23 +2231,27 @@ async function renderDetailInline(id, data, container){
     }, 4000);
   }
 
-  if (!openDraw) return; // pas de tirage actif : rien de plus à câbler
+  if (!currentDraw) return; // ni tirage ouvert, ni tirage passé : rien de plus à câbler
 
-  // ---- participants du tirage en cours (pour tirage au sort) ----
+  // ---- participants du tirage en cours (pour tirage au sort) — uniquement
+  // utile tant qu'un tirage accepte encore des inscriptions ----
   let drawParticipants = [];
-  const drawUnsub = onSnapshot(query(collection(db,"participants"), where("restaurantId","==",id), where("drawId","==",openDraw.id)), (snap) => {
-    drawParticipants = snap.docs.map(d => d.data());
-    const el = container.querySelector(".live-draw-count");
-    if (el) el.textContent = `(${drawParticipants.length})`;
-  }, (err) => {
-    console.error("[tiketo] échec lecture participants du tirage:", err);
-    const el = container.querySelector(".live-draw-count");
-    if (el) el.textContent = " — erreur de lecture";
-    const box = container.querySelector(".winner-box");
-    if (box) box.innerHTML = `<span class="err">Impossible de lire les participants : ${esc(err?.message || String(err))}</span>`;
-  });
+  let drawUnsub = null;
+  if (openDraw) {
+    drawUnsub = onSnapshot(query(collection(db,"participants"), where("restaurantId","==",id), where("drawId","==",openDraw.id)), (snap) => {
+      drawParticipants = snap.docs.map(d => d.data());
+      const el = container.querySelector(".live-draw-count");
+      if (el) el.textContent = `(${drawParticipants.length})`;
+    }, (err) => {
+      console.error("[tiketo] échec lecture participants du tirage:", err);
+      const el = container.querySelector(".live-draw-count");
+      if (el) el.textContent = " — erreur de lecture";
+      const box = container.querySelector(".winner-box");
+      if (box) box.innerHTML = `<span class="err">Impossible de lire les participants : ${esc(err?.message || String(err))}</span>`;
+    });
+  }
 
-  container._unsub = [clientsUnsub, drawUnsub];
+  container._unsub = [clientsUnsub, drawUnsub].filter(Boolean);
 
   function wireWinnerUI(w){
     const msgsWrap = container.querySelector(".winner-msgs");
@@ -2244,7 +2261,7 @@ async function renderDetailInline(id, data, container){
     const loseTitleEl = container.querySelector(".lose-title");
     const loseMsgEl = container.querySelector(".lose-message");
     if (!winTitleEl.value.trim()) winTitleEl.value = `Tu as gagné ! — ${data.name}`;
-    if (!winMsgEl.value.trim()) winMsgEl.value = `🎉 Félicitations ${w.prenom} ! Tu as gagné : ${openDraw.prize}. Passe le récupérer chez ${data.name}.`;
+    if (!winMsgEl.value.trim()) winMsgEl.value = `🎉 Félicitations ${w.prenom} ! Tu as gagné : ${currentDraw.prize}. Passe le récupérer chez ${data.name}.`;
     if (!loseTitleEl.value.trim()) loseTitleEl.value = `Résultat du tirage — ${data.name}`;
     if (!loseMsgEl.value.trim()) loseMsgEl.value = `Le gagnant est ${w.prenom}. Merci d'avoir participé, à bientôt pour le prochain tirage chez ${data.name} !`;
 
@@ -2259,7 +2276,7 @@ async function renderDetailInline(id, data, container){
         const idToken = await auth.currentUser.getIdToken();
         const r = await fetch("/api/send-promo", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken, external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win", drawId: openDraw.id, code: w.code })
+          body: JSON.stringify({ idToken, external_ids: [w.email.toLowerCase()], title, message, resto_id: id, origin: window.location.origin, result: "win", drawId: currentDraw.id, code: w.code })
         });
         const out = await r.json();
         if (!r.ok) throw new Error(out?.error || "Erreur inconnue");
@@ -2305,7 +2322,7 @@ async function renderDetailInline(id, data, container){
 
   // le gagnant avait déjà été tiré avant un précédent rechargement de page :
   // on restaure les boutons d'envoi tout de suite, sans attendre un nouveau clic
-  if (openDraw.winner) wireWinnerUI(openDraw.winner);
+  if (currentDraw.winner) wireWinnerUI(currentDraw.winner);
 
   const drawBtnEl = container.querySelector(".draw-btn");
   if (drawBtnEl) drawBtnEl.onclick = () => {
@@ -2337,7 +2354,9 @@ async function renderDetailInline(id, data, container){
         const winnerData = { prenom: w.prenom, email: w.email, code: genWinnerCode(), claimed: false };
         openDraw.winner = winnerData;
         if (drawBtnEl) drawBtnEl.remove();
-        updateDoc(doc(db,"draws",openDraw.id), { winner: winnerData }).catch(()=>{});
+        updateDoc(doc(db,"draws",openDraw.id), {
+          winner: winnerData, status: "closed", closedAt: serverTimestamp(), participantCountAtClose: drawParticipants.length
+        }).catch(()=>{});
         wireWinnerUI(winnerData);
       }
     }, 90);
