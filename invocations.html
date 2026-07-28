@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Deentag — Lisez et apprenez les invocations islamiques (duas) en arabe, phonétique et traduction. Application gratuite et illimitée.">
+<meta property="og:title" content="Deentag — Invocations islamiques">
+<meta property="og:description" content="Lisez et apprenez les duas en arabe, phonétique et traduction. Application gratuite, sans abonnement.">
+<meta property="og:url" content="https://deentag.vercel.app/invocations.html">
+<meta property="og:image" content="https://deentag.vercel.app/images/logo.webp">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0F0D08">
+<link rel="canonical" href="https://deentag.vercel.app/invocations.html">
+<title>Deentag — Invocations islamiques, Coran et objet connecté</title>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Deentag",
+  "url": "https://deentag.vercel.app",
+  "logo": "https://deentag.vercel.app/images/logo.webp"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Deentag",
+  "url": "https://deentag.vercel.app"
+}
+</script>
+<link rel="stylesheet" href="css/adult.css">
+<link rel="icon" href="favicon.png" type="image/png">
+<script>
+(function(){
+  var t=localStorage.getItem('deentag_theme')||'day';
+  var l=localStorage.getItem('deentag_lang')||'fr';
+  var k=localStorage.getItem('deentag_kids')==='on';
+  document.documentElement.setAttribute('data-theme',t);
+  document.documentElement.setAttribute('data-lang',l);
+  if(k) document.documentElement.setAttribute('data-kids','on');
+  document.addEventListener('DOMContentLoaded',function(){
+    var b=document.body;
+    b.classList.remove('day','night');
+    b.classList.add(t);
+    if(k) b.classList.add('kids');
+    var btn=document.getElementById('lang-btn');
+    if(btn) btn.textContent=l.toUpperCase()+' ▾';
+  });
+})();
+</script>
+</head>
+<body class="day" data-page="invocations">
+
+<!-- SPLASH DE LANCEMENT -->
+<div class="app-splash" id="appSplash">
+  <div class="app-splash-logo"></div>
+  <div class="app-splash-brand">DEENTAG</div>
+</div>
+<script>
+(function(){
+  var t0 = performance.now();
+  var MIN_VISIBLE = 350; // évite un flash si le chargement est très rapide
+  var MAX_VISIBLE = 2500; // filet de sécurité si un événement de chargement ne se déclenche jamais
+  var hidden = false;
+  function hideSplash(){
+    if (hidden) return;
+    var elapsed = performance.now() - t0;
+    var wait = Math.max(0, MIN_VISIBLE - elapsed);
+    setTimeout(function(){
+      hidden = true;
+      var el = document.getElementById('appSplash');
+      if (!el) return;
+      el.classList.add('hide');
+      setTimeout(function(){ el.style.display = 'none'; }, 400);
+    }, wait);
+  }
+  window.addEventListener('load', hideSplash);
+  setTimeout(hideSplash, MAX_VISIBLE);
+})();
+</script>
+
+<!-- TOPBAR -->
+<div class="app-topbar">
+  <!-- ETOILES (mode nuit) -->
+  <div class="night-stars" id="nightStars"></div>
+  <!-- GAUCHE : langue -->
+  <div class="app-topbar-left">
+    <div class="lang-wrapper">
+      <button class="lang-btn" id="lang-btn" onclick="toggleLangMenu()">FR ▾</button>
+      <div class="lang-menu" id="lang-menu">
+        <span class="lang-option" data-lang="de" onclick="setLang('de')"><span class="lang-flag">🇩🇪</span>Deutsch</span>
+        <span class="lang-option" data-lang="en" onclick="setLang('en')"><span class="lang-flag">🇬🇧</span>English</span>
+        <span class="lang-option" data-lang="es" onclick="setLang('es')"><span class="lang-flag">🇪🇸</span>Español</span>
+        <span class="lang-option" data-lang="fr" onclick="setLang('fr')"><span class="lang-flag">🇫🇷</span>Français</span>
+        <span class="lang-option" data-lang="it" onclick="setLang('it')"><span class="lang-flag">🇮🇹</span>Italiano</span>
+        <span class="lang-option" data-lang="nl" onclick="setLang('nl')"><span class="lang-flag">🇳🇱</span>Nederlands</span>
+        <span class="lang-option" data-lang="pt" onclick="setLang('pt')"><span class="lang-flag">🇵🇹</span>Português</span>
+        <span class="lang-option" data-lang="tr" onclick="setLang('tr')"><span class="lang-flag">🇹🇷</span>Türkçe</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTRE : logo seul -->
+  <div class="app-topbar-center">
+    <a href="index.html" aria-label="Accueil Deentag">
+      <img src="images/logo.webp" class="app-topbar-logo logo-day" alt="Deentag">
+      <img src="images/logo-night.webp" class="app-topbar-logo logo-night" alt="Deentag">
+    </a>
+  </div>
+
+  <!-- DROITE : thème -->
+  <div class="app-topbar-right">
+    <button class="theme-knob-btn" onclick="toggleTheme()" id="theme-circle-btn" aria-label="Changer le thème">
+      <div class="theme-knob-btn-inner">
+        <svg class="tt-sun" width="18" height="18" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="6" fill="#c8922a"/><g stroke="#c8922a" stroke-width="2.2" stroke-linecap="round"><line x1="16" y1="3" x2="16" y2="7"/><line x1="16" y1="25" x2="16" y2="29"/><line x1="3" y1="16" x2="7" y2="16"/><line x1="25" y1="16" x2="29" y2="16"/><line x1="6.9" y1="6.9" x2="9.8" y2="9.8"/><line x1="22.2" y1="22.2" x2="25.1" y2="25.1"/><line x1="25.1" y1="6.9" x2="22.2" y2="9.8"/><line x1="9.8" y1="22.2" x2="6.9" y2="25.1"/></g></svg>
+        <svg class="tt-moon" width="15" height="15" viewBox="0 0 28 28" fill="none"><path d="M22 17.5A10 10 0 0 1 10.5 6a10 10 0 1 0 11.5 11.5z" fill="#7abf95"/><circle cx="20" cy="8" r="1.5" fill="#c8d8b0" opacity="0.7"/><circle cx="23" cy="12" r="1" fill="#c8d8b0" opacity="0.5"/></svg>
+      </div>
+    </button>
+  </div>
+</div>
+
+<!-- HEADER (nom + tagline) -->
+<div class="index-header">
+  <div class="index-brand">DEENTAG</div>
+  <div class="index-ornament">
+    <div class="index-ornament-line"></div>
+    <span class="ornament-star">✦</span>
+    <div class="index-ornament-line"></div>
+  </div>
+  <div class="section-title">
+    <span class="lang-block" data-lang-block="fr">Invocations</span>
+    <span class="lang-block" data-lang-block="en">Invocations</span>
+    <span class="lang-block" data-lang-block="es">Invocaciones</span>
+    <span class="lang-block" data-lang-block="de">Bittgebete</span>
+    <span class="lang-block" data-lang-block="it">Invocazioni</span>
+    <span class="lang-block" data-lang-block="nl">Smeekbeden</span>
+    <span class="lang-block" data-lang-block="pt">Invocações</span>
+    <span class="lang-block" data-lang-block="tr">Dualar</span>
+  </div>
+</div>
+
+<!-- RECHERCHE D'INVOCATIONS -->
+<div class="inv-search-wrap">
+  <input type="text" class="inv-search-input" id="invSearchInput" placeholder="🔍 Rechercher une invocation..." oninput="handleInvSearch(this.value)" onfocus="handleInvSearch(this.value)">
+  <div class="inv-search-results" id="invSearchResults"></div>
+</div>
+
+<!-- CHIPS DE NAVIGATION RAPIDE -->
+<div class="section-nav" id="sectionNav">
+  <button class="section-chip" data-jump="Quotidien" onclick="jumpToSection('Quotidien')">
+    <span class="lang-block" data-lang-block="fr">Quotidien</span>
+    <span class="lang-block" data-lang-block="en">Daily</span>
+    <span class="lang-block" data-lang-block="es">Cotidiano</span>
+    <span class="lang-block" data-lang-block="de">Alltag</span>
+    <span class="lang-block" data-lang-block="it">Quotidiano</span>
+    <span class="lang-block" data-lang-block="nl">Dagelijks</span>
+    <span class="lang-block" data-lang-block="pt">Quotidiano</span>
+    <span class="lang-block" data-lang-block="tr">Günlük</span>
+  </button>
+  <button class="section-chip" data-jump="Adorations" onclick="jumpToSection('Adorations')">
+    <span class="lang-block" data-lang-block="fr">Adorations</span>
+    <span class="lang-block" data-lang-block="en">Worship</span>
+    <span class="lang-block" data-lang-block="es">Adoración</span>
+    <span class="lang-block" data-lang-block="de">Andacht</span>
+    <span class="lang-block" data-lang-block="it">Adorazione</span>
+    <span class="lang-block" data-lang-block="nl">Aanbidding</span>
+    <span class="lang-block" data-lang-block="pt">Adoração</span>
+    <span class="lang-block" data-lang-block="tr">İbadet</span>
+  </button>
+  <button class="section-chip" data-jump="Épreuves & Émotions" onclick="jumpToSection('Épreuves &amp; Émotions')">
+    <span class="lang-block" data-lang-block="fr">Épreuves</span>
+    <span class="lang-block" data-lang-block="en">Trials</span>
+    <span class="lang-block" data-lang-block="es">Pruebas</span>
+    <span class="lang-block" data-lang-block="de">Prüfungen</span>
+    <span class="lang-block" data-lang-block="it">Prove</span>
+    <span class="lang-block" data-lang-block="nl">Beproevingen</span>
+    <span class="lang-block" data-lang-block="pt">Provações</span>
+    <span class="lang-block" data-lang-block="tr">Sınavlar</span>
+  </button>
+  <button class="section-chip" data-jump="Vie personnelle" onclick="jumpToSection('Vie personnelle')">
+    <span class="lang-block" data-lang-block="fr">Vie perso</span>
+    <span class="lang-block" data-lang-block="en">Personal</span>
+    <span class="lang-block" data-lang-block="es">Vida personal</span>
+    <span class="lang-block" data-lang-block="de">Privatleben</span>
+    <span class="lang-block" data-lang-block="it">Vita personale</span>
+    <span class="lang-block" data-lang-block="nl">Persoonlijk</span>
+    <span class="lang-block" data-lang-block="pt">Vida pessoal</span>
+    <span class="lang-block" data-lang-block="tr">Özel hayat</span>
+  </button>
+  <button class="section-chip" data-jump="Circonstances" onclick="jumpToSection('Circonstances')">
+    <span class="lang-block" data-lang-block="fr">Circonstances</span>
+    <span class="lang-block" data-lang-block="en">Circumstances</span>
+    <span class="lang-block" data-lang-block="es">Circunstancias</span>
+    <span class="lang-block" data-lang-block="de">Umstände</span>
+    <span class="lang-block" data-lang-block="it">Circostanze</span>
+    <span class="lang-block" data-lang-block="nl">Omstandigheden</span>
+    <span class="lang-block" data-lang-block="pt">Circunstâncias</span>
+    <span class="lang-block" data-lang-block="tr">Durumlar</span>
+  </button>
+</div>
+
+<!-- GRILLE -->
+<div class="cat-pager" id="catPager">
+<div class="cat-section cat-section--open" data-section="Quotidien">
+  <div class="cat-section-header">
+    <span class="cat-section-line"></span>
+    <span class="cat-section-title">Quotidien</span>
+    <span class="cat-section-line"></span>
+  </div>
+  <div class="cat-grid">
+  <div class="cat-card" onclick="openSheet('repas')">
+    <div class="cat-icon-circle"><img src="images/repas.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+        <span class="lang-block" data-lang-block="fr">Repas</span>
+        <span class="lang-block" data-lang-block="en">Meals</span>
+        <span class="lang-block" data-lang-block="es">Comidas</span>
+        <span class="lang-block" data-lang-block="de">Mahlzeiten</span>
+        <span class="lang-block" data-lang-block="it">Pasti</span>
+        <span class="lang-block" data-lang-block="nl">Maaltijden</span>
+        <span class="lang-block" data-lang-block="pt">Refeições</span>
+        <span class="lang-block" data-lang-block="tr">Yemekler</span>
+      </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('reveil')">
+    <div class="cat-icon-circle"><img src="images/lit.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+        <span class="lang-block" data-lang-block="fr">Réveil &amp; Couché</span>
+        <span class="lang-block" data-lang-block="en">Wake &amp; Sleep</span>
+        <span class="lang-block" data-lang-block="es">Despertar &amp; Dormir</span>
+        <span class="lang-block" data-lang-block="de">Aufwachen &amp; Schlafen</span>
+        <span class="lang-block" data-lang-block="it">Sveglio &amp; Sonno</span>
+        <span class="lang-block" data-lang-block="nl">Wakker &amp; Slapen</span>
+        <span class="lang-block" data-lang-block="pt">Acordar &amp; Dormir</span>
+        <span class="lang-block" data-lang-block="tr">Uyanış &amp; Uyku</span>
+      </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('ablution')">
+    <div class="cat-icon-circle"><img src="images/ablution.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+        <span class="lang-block" data-lang-block="fr">Ablution</span>
+        <span class="lang-block" data-lang-block="en">Ablution</span>
+        <span class="lang-block" data-lang-block="es">Ablución</span>
+        <span class="lang-block" data-lang-block="de">Ablution</span>
+        <span class="lang-block" data-lang-block="it">Abluzione</span>
+        <span class="lang-block" data-lang-block="nl">Reiniging</span>
+        <span class="lang-block" data-lang-block="pt">Ablução</span>
+        <span class="lang-block" data-lang-block="tr">Abdest</span>
+      </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('toilettes')">
+    <div class="cat-icon-circle"><img src="images/wc.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+        <span class="lang-block" data-lang-block="fr">Toilettes</span>
+        <span class="lang-block" data-lang-block="en">Restroom</span>
+        <span class="lang-block" data-lang-block="es">Baño</span>
+        <span class="lang-block" data-lang-block="de">Toilette</span>
+        <span class="lang-block" data-lang-block="it">Bagno</span>
+        <span class="lang-block" data-lang-block="nl">Toilet</span>
+        <span class="lang-block" data-lang-block="pt">Casa de Banho</span>
+        <span class="lang-block" data-lang-block="tr">Tuvalet</span>
+      </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('maison')">
+    <div class="cat-icon-circle"><img src="images/maison.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+        <span class="lang-block" data-lang-block="fr">Maison</span>
+        <span class="lang-block" data-lang-block="en">Home</span>
+        <span class="lang-block" data-lang-block="es">Casa</span>
+        <span class="lang-block" data-lang-block="de">Zuhause</span>
+        <span class="lang-block" data-lang-block="it">Casa</span>
+        <span class="lang-block" data-lang-block="nl">Thuis</span>
+        <span class="lang-block" data-lang-block="pt">Casa</span>
+        <span class="lang-block" data-lang-block="tr">Ev</span>
+      </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('transport')">
+    <div class="cat-icon-circle"><img src="images/voiture.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+        <span class="lang-block" data-lang-block="fr">Transport &amp; Voyage</span>
+        <span class="lang-block" data-lang-block="en">Transport &amp; Travel</span>
+        <span class="lang-block" data-lang-block="es">Transporte y Viaje</span>
+        <span class="lang-block" data-lang-block="de">Transport &amp; Reise</span>
+        <span class="lang-block" data-lang-block="it">Trasporto e Viaggio</span>
+        <span class="lang-block" data-lang-block="nl">Transport &amp; Reizen</span>
+        <span class="lang-block" data-lang-block="pt">Transporte e Viagem</span>
+        <span class="lang-block" data-lang-block="tr">Ulaşım &amp; Seyahat</span>
+      </div>
+  </div>
+  </div>
+</div>
+
+<div class="cat-section" data-section="Adorations">
+  <div class="cat-section-header">
+    <span class="cat-section-line"></span>
+    <span class="cat-section-title">Adorations</span>
+    <span class="cat-section-line"></span>
+  </div>
+  <div class="cat-grid">
+  <div class="cat-card" onclick="openSheet('mosquee')">
+    <div class="cat-icon-circle"><img src="images/mosquee.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Mosquée</span>
+      <span class="lang-block" data-lang-block="en">Mosque</span>
+      <span class="lang-block" data-lang-block="es">Mezquita</span>
+      <span class="lang-block" data-lang-block="de">Moschee</span>
+      <span class="lang-block" data-lang-block="it">Moschea</span>
+      <span class="lang-block" data-lang-block="nl">Moskee</span>
+      <span class="lang-block" data-lang-block="pt">Mesquita</span>
+      <span class="lang-block" data-lang-block="tr">Cami</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('azan')">
+    <div class="cat-icon-circle"><img src="images/azan.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Azan</span>
+      <span class="lang-block" data-lang-block="en">Azan</span>
+      <span class="lang-block" data-lang-block="es">Azan</span>
+      <span class="lang-block" data-lang-block="de">Azan</span>
+      <span class="lang-block" data-lang-block="it">Azan</span>
+      <span class="lang-block" data-lang-block="nl">Azan</span>
+      <span class="lang-block" data-lang-block="pt">Azan</span>
+      <span class="lang-block" data-lang-block="tr">Ezan</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('salah')">
+    <div class="cat-icon-circle"><img src="images/salah.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Salah</span>
+      <span class="lang-block" data-lang-block="en">Prayer</span>
+      <span class="lang-block" data-lang-block="es">Oración</span>
+      <span class="lang-block" data-lang-block="de">Gebet</span>
+      <span class="lang-block" data-lang-block="it">Preghiera</span>
+      <span class="lang-block" data-lang-block="nl">Gebed</span>
+      <span class="lang-block" data-lang-block="pt">Oração</span>
+      <span class="lang-block" data-lang-block="tr">Namaz</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('istikhara')">
+    <div class="cat-icon-circle"><img src="images/istikhara.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Istikhara</span>
+      <span class="lang-block" data-lang-block="en">Istikhara</span>
+      <span class="lang-block" data-lang-block="es">Istikhara</span>
+      <span class="lang-block" data-lang-block="de">Istikhara</span>
+      <span class="lang-block" data-lang-block="it">Istikhara</span>
+      <span class="lang-block" data-lang-block="nl">Istikhara</span>
+      <span class="lang-block" data-lang-block="pt">Istikhara</span>
+      <span class="lang-block" data-lang-block="tr">İstihare</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('ramadan')">
+    <div class="cat-icon-circle"><img src="images/ramadan.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Ramadan</span>
+      <span class="lang-block" data-lang-block="en">Ramadan</span>
+      <span class="lang-block" data-lang-block="es">Ramadán</span>
+      <span class="lang-block" data-lang-block="de">Ramadan</span>
+      <span class="lang-block" data-lang-block="it">Ramadan</span>
+      <span class="lang-block" data-lang-block="nl">Ramadan</span>
+      <span class="lang-block" data-lang-block="pt">Ramadão</span>
+      <span class="lang-block" data-lang-block="tr">Ramazan</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('hajjumra')">
+    <div class="cat-icon-circle"><img src="images/hajjumra.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Hajj &amp; Umra</span>
+      <span class="lang-block" data-lang-block="en">Hajj &amp; Umrah</span>
+      <span class="lang-block" data-lang-block="es">Hajj &amp; Umrah</span>
+      <span class="lang-block" data-lang-block="de">Hadsch &amp; Umrah</span>
+      <span class="lang-block" data-lang-block="it">Hajj &amp; Umrah</span>
+      <span class="lang-block" data-lang-block="nl">Hajj &amp; Umrah</span>
+      <span class="lang-block" data-lang-block="pt">Hajj &amp; Umrah</span>
+      <span class="lang-block" data-lang-block="tr">Hac &amp; Umre</span>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div class="cat-section" data-section="Épreuves & Émotions">
+  <div class="cat-section-header">
+    <span class="cat-section-line"></span>
+    <span class="cat-section-title">Épreuves & Émotions</span>
+    <span class="cat-section-line"></span>
+  </div>
+  <div class="cat-grid">
+  <div class="cat-card" onclick="openSheet('tristesse')">
+    <div class="cat-icon-circle"><img src="images/tristesse.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Tristesse</span>
+      <span class="lang-block" data-lang-block="en">Sadness</span>
+      <span class="lang-block" data-lang-block="es">Tristeza</span>
+      <span class="lang-block" data-lang-block="de">Traurigkeit</span>
+      <span class="lang-block" data-lang-block="it">Tristezza</span>
+      <span class="lang-block" data-lang-block="nl">Verdriet</span>
+      <span class="lang-block" data-lang-block="pt">Tristeza</span>
+      <span class="lang-block" data-lang-block="tr">Üzüntü</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('maladie')">
+    <div class="cat-icon-circle"><img src="images/maladie.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Maladie</span>
+      <span class="lang-block" data-lang-block="en">Illness</span>
+      <span class="lang-block" data-lang-block="es">Enfermedad</span>
+      <span class="lang-block" data-lang-block="de">Krankheit</span>
+      <span class="lang-block" data-lang-block="it">Malattia</span>
+      <span class="lang-block" data-lang-block="nl">Ziekte</span>
+      <span class="lang-block" data-lang-block="pt">Doença</span>
+      <span class="lang-block" data-lang-block="tr">Hastalık</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('colere')">
+    <div class="cat-icon-circle"><img src="images/colere.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Colère</span>
+      <span class="lang-block" data-lang-block="en">Anger</span>
+      <span class="lang-block" data-lang-block="es">Ira</span>
+      <span class="lang-block" data-lang-block="de">Zorn</span>
+      <span class="lang-block" data-lang-block="it">Rabbia</span>
+      <span class="lang-block" data-lang-block="nl">Woede</span>
+      <span class="lang-block" data-lang-block="pt">Raiva</span>
+      <span class="lang-block" data-lang-block="tr">Öfke</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('ruqya')">
+    <div class="cat-icon-circle"><img src="images/ruqya.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Ruqya</span>
+      <span class="lang-block" data-lang-block="en">Ruqya</span>
+      <span class="lang-block" data-lang-block="es">Ruqya</span>
+      <span class="lang-block" data-lang-block="de">Ruqya</span>
+      <span class="lang-block" data-lang-block="it">Ruqya</span>
+      <span class="lang-block" data-lang-block="nl">Ruqya</span>
+      <span class="lang-block" data-lang-block="pt">Ruqya</span>
+      <span class="lang-block" data-lang-block="tr">Rukye</span>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div class="cat-section" data-section="Vie personnelle">
+  <div class="cat-section-header">
+    <span class="cat-section-line"></span>
+    <span class="cat-section-title">Vie personnelle</span>
+    <span class="cat-section-line"></span>
+  </div>
+  <div class="cat-grid">
+  <div class="cat-card" onclick="openSheet('mariage')">
+    <div class="cat-icon-circle"><img src="images/mariage.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Mariage</span>
+      <span class="lang-block" data-lang-block="en">Marriage</span>
+      <span class="lang-block" data-lang-block="es">Matrimonio</span>
+      <span class="lang-block" data-lang-block="de">Heirat</span>
+      <span class="lang-block" data-lang-block="it">Matrimonio</span>
+      <span class="lang-block" data-lang-block="nl">Huwelijk</span>
+      <span class="lang-block" data-lang-block="pt">Casamento</span>
+      <span class="lang-block" data-lang-block="tr">Evlilik</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('enfants')">
+    <div class="cat-icon-circle"><img src="images/enfants.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Enfants</span>
+      <span class="lang-block" data-lang-block="en">Children</span>
+      <span class="lang-block" data-lang-block="es">Niños</span>
+      <span class="lang-block" data-lang-block="de">Kinder</span>
+      <span class="lang-block" data-lang-block="it">Bambini</span>
+      <span class="lang-block" data-lang-block="nl">Kinderen</span>
+      <span class="lang-block" data-lang-block="pt">Crianças</span>
+      <span class="lang-block" data-lang-block="tr">Çocuklar</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('nouveaune')">
+    <div class="cat-icon-circle"><img src="images/nouveaune.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Nouveau-né</span>
+      <span class="lang-block" data-lang-block="en">Newborn</span>
+      <span class="lang-block" data-lang-block="es">Recién nacido</span>
+      <span class="lang-block" data-lang-block="de">Neugeborenes</span>
+      <span class="lang-block" data-lang-block="it">Neonato</span>
+      <span class="lang-block" data-lang-block="nl">Baby</span>
+      <span class="lang-block" data-lang-block="pt">Recém-nascido</span>
+      <span class="lang-block" data-lang-block="tr">Yenidoğan</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('mort')">
+    <div class="cat-icon-circle"><img src="images/mort.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Mort &amp; Funérailles</span>
+      <span class="lang-block" data-lang-block="en">Death &amp; Funeral</span>
+      <span class="lang-block" data-lang-block="es">Muerte &amp; Funeral</span>
+      <span class="lang-block" data-lang-block="de">Tod &amp; Beerdigung</span>
+      <span class="lang-block" data-lang-block="it">Morte &amp; Funerale</span>
+      <span class="lang-block" data-lang-block="nl">Dood &amp; Begrafenis</span>
+      <span class="lang-block" data-lang-block="pt">Morte &amp; Funeral</span>
+      <span class="lang-block" data-lang-block="tr">Ölüm &amp; Cenaze</span>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div class="cat-section" data-section="Circonstances">
+  <div class="cat-section-header">
+    <span class="cat-section-line"></span>
+    <span class="cat-section-title">Circonstances</span>
+    <span class="cat-section-line"></span>
+  </div>
+  <div class="cat-grid">
+  <div class="cat-card" onclick="openSheet('pluie')">
+    <div class="cat-icon-circle"><img src="images/pluie.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Pluie</span>
+      <span class="lang-block" data-lang-block="en">Rain</span>
+      <span class="lang-block" data-lang-block="es">Lluvia</span>
+      <span class="lang-block" data-lang-block="de">Regen</span>
+      <span class="lang-block" data-lang-block="it">Pioggia</span>
+      <span class="lang-block" data-lang-block="nl">Regen</span>
+      <span class="lang-block" data-lang-block="pt">Chuva</span>
+      <span class="lang-block" data-lang-block="tr">Yağmur</span>
+    </div>
+  </div>
+  <div class="cat-card" onclick="openSheet('rizq')">
+    <div class="cat-icon-circle"><img src="images/rizq.webp" class="cat-icon" alt=""></div>
+    <div class="cat-label">
+      <span class="lang-block" data-lang-block="fr">Rizq</span>
+      <span class="lang-block" data-lang-block="en">Rizq</span>
+      <span class="lang-block" data-lang-block="es">Rizq</span>
+      <span class="lang-block" data-lang-block="de">Rizq</span>
+      <span class="lang-block" data-lang-block="it">Rizq</span>
+      <span class="lang-block" data-lang-block="nl">Rizq</span>
+      <span class="lang-block" data-lang-block="pt">Rizq</span>
+      <span class="lang-block" data-lang-block="tr">Rızık</span>
+    </div>
+  </div>
+  </div>
+</div>
+</div>
+
+
+<!-- SEPARATEUR -->
+<div class="ornament-row">
+  <div class="ornament-row-line"></div>
+  <span class="ornament-star">✦</span>
+  <div class="ornament-row-line"></div>
+</div>
+
+<!-- BOUTIQUE -->
+<a href="shop.html" class="shop-link-btn">
+  <span class="shop-link-label">🏷️ BOUTIQUE</span>
+</a>
+
+<!-- SOCIAL + FLEURS -->
+<div class="social-bar">
+  <img src="images/fleurs-gauche.webp" class="fleurs-gauche" alt="">
+  <a href="https://tiktok.com/@deentag" class="social-icon" target="_blank" rel="noopener noreferrer">
+    <svg viewBox="0 0 24 24" width="19" height="19"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.76a4.85 4.85 0 01-1.01-.07z"/></svg>
+  </a>
+  <a href="https://instagram.com/deentag" class="social-icon" target="_blank" rel="noopener noreferrer">
+    <svg viewBox="0 0 24 24" width="19" height="19"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+  </a>
+  <img src="images/fleurs-droite.webp" class="fleurs-droite" alt="">
+</div>
+
+<!-- OVERLAY -->
+<div class="bs-overlay" id="bsOverlay" onclick="closeSheet()"></div>
+
+<!-- BOTTOM SHEET -->
+<div class="bottom-sheet" id="bottomSheet">
+  <div class="bs-handle"><div class="bs-handle-bar"></div></div>
+
+  <!-- VUE LISTE -->
+  <div id="listView">
+    <div class="bs-header">
+      <div class="bs-header-icon"><img id="bsIcon" src="" alt=""></div>
+      <div class="bs-header-title" id="bsTitle"></div>
+      <div class="bs-header-cat-sub" id="bsCatSub"></div>
+    </div>
+    <div class="bs-ornament">
+      <div class="bs-ornament-line"></div>
+      <span class="ornament-star">✦</span>
+      <div class="bs-ornament-line"></div>
+    </div>
+    <div class="bs-subtitle">
+      <span class="lang-block" data-lang-block="fr">Sélectionnez votre invocation</span>
+      <span class="lang-block" data-lang-block="en">Select your supplication</span>
+      <span class="lang-block" data-lang-block="es">Seleccione su invocación</span>
+      <span class="lang-block" data-lang-block="de">Wählen Sie Ihr Bittgebet</span>
+      <span class="lang-block" data-lang-block="it">Seleziona la tua invocazione</span>
+      <span class="lang-block" data-lang-block="nl">Selecteer uw smeekgebed</span>
+      <span class="lang-block" data-lang-block="pt">Selecione a sua invocação</span>
+      <span class="lang-block" data-lang-block="tr">Duanızı seçin</span>
+    </div>
+    <div class="bs-grid" id="bsList"></div>
+  </div>
+
+  <!-- VUE PROFIL -->
+  <div id="profileView" style="display:none;">
+    <div class="dua-topbar">
+      <button class="theme-knob-btn" onclick="closeProfileView()" aria-label="Fermer">
+        <div class="theme-knob-btn-inner">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </div>
+      </button>
+      <div id="profileViewTitle" style="font-family:Cinzel,serif;font-size:13px;font-weight:600;color:var(--gold);letter-spacing:0.1em;"></div>
+      <button class="theme-knob-btn" onclick="toggleTheme()" aria-label="Changer le thème">
+        <div class="theme-knob-btn-inner">
+          <svg class="tt-sun" width="18" height="18" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="6" fill="#c8922a"/><g stroke="#c8922a" stroke-width="2.2" stroke-linecap="round"><line x1="16" y1="3" x2="16" y2="7"/><line x1="16" y1="25" x2="16" y2="29"/><line x1="3" y1="16" x2="7" y2="16"/><line x1="25" y1="16" x2="29" y2="16"/><line x1="6.9" y1="6.9" x2="9.8" y2="9.8"/><line x1="22.2" y1="22.2" x2="25.1" y2="25.1"/><line x1="25.1" y1="6.9" x2="22.2" y2="9.8"/><line x1="9.8" y1="22.2" x2="6.9" y2="25.1"/></g></svg>
+          <svg class="tt-moon" width="15" height="15" viewBox="0 0 28 28" fill="none"><path d="M22 17.5A10 10 0 0 1 10.5 6a10 10 0 1 0 11.5 11.5z" fill="#7abf95"/><circle cx="20" cy="8" r="1.5" fill="#c8d8b0" opacity="0.7"/><circle cx="23" cy="12" r="1" fill="#c8d8b0" opacity="0.5"/></svg>
+        </div>
+      </button>
+    </div>
+    <div id="profileScroll" style="overflow-y:auto;max-height:calc(88vh - 60px);"></div>
+  </div>
+
+  <!-- VUE DUA -->
+  <div id="duaView">
+    <div class="dua-topbar">
+      <button class="theme-knob-btn" onclick="backToList()" aria-label="Retour">
+        <div class="theme-knob-btn-inner">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </div>
+      </button>
+      <img id="duaCatIcon" src="" alt="" class="dua-cat-icon">
+      <button class="theme-knob-btn" onclick="toggleTheme()" aria-label="Changer le thème">
+        <div class="theme-knob-btn-inner">
+          <svg class="tt-sun" width="18" height="18" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="6" fill="#c8922a"/><g stroke="#c8922a" stroke-width="2.2" stroke-linecap="round"><line x1="16" y1="3" x2="16" y2="7"/><line x1="16" y1="25" x2="16" y2="29"/><line x1="3" y1="16" x2="7" y2="16"/><line x1="25" y1="16" x2="29" y2="16"/><line x1="6.9" y1="6.9" x2="9.8" y2="9.8"/><line x1="22.2" y1="22.2" x2="25.1" y2="25.1"/><line x1="25.1" y1="6.9" x2="22.2" y2="9.8"/><line x1="9.8" y1="22.2" x2="6.9" y2="25.1"/></g></svg>
+          <svg class="tt-moon" width="15" height="15" viewBox="0 0 28 28" fill="none"><path d="M22 17.5A10 10 0 0 1 10.5 6a10 10 0 1 0 11.5 11.5z" fill="#7abf95"/><circle cx="20" cy="8" r="1.5" fill="#c8d8b0" opacity="0.7"/><circle cx="23" cy="12" r="1" fill="#c8d8b0" opacity="0.5"/></svg>
+        </div>
+      </button>
+    </div>
+    <!-- Menu taille texte -->
+    <div id="duaScroll"></div>
+  </div>
+</div>
+
+<script src="js/duas.js"></script>
+<script src="js/app.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/profiles.js"></script>
+<script src="js/prayer-times.js"></script>
+<script src="js/hscroll.js"></script>
+
+</body>
+</html>
